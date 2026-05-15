@@ -196,7 +196,6 @@ func subscriptionRequestHeaders() map[string]string {
 		"X-HWID-OS-Version":      metadata.OSVersion,
 		"X-HWID-Device-Model":    metadata.DeviceModel,
 		"X-HWID-User-Agent":      metadata.UserAgent,
-		"X-Exodus-Client-Type":   "singbox-wrapper",
 		"X-Singbox-Wrapper-HWID": metadata.HWID,
 	}
 }

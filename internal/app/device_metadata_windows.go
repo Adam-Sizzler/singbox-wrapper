@@ -32,31 +32,80 @@ func appVersionHeader() string {
 }
 
 func windowsOSVersion() string {
-	productName := readRegistryString(`SOFTWARE\Microsoft\Windows NT\CurrentVersion`, "ProductName")
-	displayVersion := readRegistryString(`SOFTWARE\Microsoft\Windows NT\CurrentVersion`, "DisplayVersion")
-	if displayVersion == "" {
-		displayVersion = readRegistryString(`SOFTWARE\Microsoft\Windows NT\CurrentVersion`, "ReleaseId")
-	}
-	buildNumber := readRegistryString(`SOFTWARE\Microsoft\Windows NT\CurrentVersion`, "CurrentBuildNumber")
-	ubr := readRegistryString(`SOFTWARE\Microsoft\Windows NT\CurrentVersion`, "UBR")
+	majorStr := readRegistryString(`SOFTWARE\Microsoft\Windows NT\CurrentVersion`, "CurrentMajorVersionNumber")
+	buildStr := readRegistryString(`SOFTWARE\Microsoft\Windows NT\CurrentVersion`, "CurrentBuildNumber")
+	ubrStr := readRegistryString(`SOFTWARE\Microsoft\Windows NT\CurrentVersion`, "UBR")
+	edition := readRegistryString(`SOFTWARE\Microsoft\Windows NT\CurrentVersion`, "EditionID")
+	display := readRegistryString(`SOFTWARE\Microsoft\Windows NT\CurrentVersion`, "DisplayVersion")
 
-	parts := make([]string, 0, 3)
-	if productName != "" {
-		parts = append(parts, productName)
-	}
-	if displayVersion != "" {
-		parts = append(parts, displayVersion)
-	}
-	if buildNumber != "" {
-		if ubr != "" {
-			buildNumber += "." + ubr
+	major := parseUint32(majorStr)
+	build := parseUint32(buildStr)
+
+	var osName string
+	switch {
+	case major >= 10 && build >= 22000:
+		osName = "Windows 11"
+	case major >= 10:
+		osName = "Windows 10"
+	default:
+		osName = readRegistryString(`SOFTWARE\Microsoft\Windows NT\CurrentVersion`, "ProductName")
+		if osName == "" {
+			osName = "Windows"
 		}
-		parts = append(parts, "build "+buildNumber)
 	}
-	if len(parts) == 0 {
-		return "windows"
+
+	if friendly := editionFriendlyName(edition); friendly != "" {
+		osName += " " + friendly
 	}
+
+	parts := []string{osName}
+
+	if display != "" {
+		parts = append(parts, display)
+	}
+
+	if buildStr != "" {
+		b := buildStr
+		if ubrStr != "" {
+			b += "." + ubrStr
+		}
+		parts = append(parts, "build "+b)
+	}
+
 	return strings.Join(parts, " ")
+}
+
+func editionFriendlyName(editionID string) string {
+	switch strings.ToLower(strings.TrimSpace(editionID)) {
+	case "professional", "professionaln":
+		return "Pro"
+	case "professionalworkstation":
+		return "Pro for Workstations"
+	case "enterprise", "enterprisen":
+		return "Enterprise"
+	case "education", "educationn":
+		return "Education"
+	case "home", "homen", "core", "coren":
+		return "Home"
+	case "serverstandard":
+		return "Server Standard"
+	case "serverdatacenter":
+		return "Server Datacenter"
+	default:
+		return editionID
+	}
+}
+
+func parseUint32(s string) uint32 {
+	s = strings.TrimSpace(s)
+	var n uint32
+	for _, c := range s {
+		if c < '0' || c > '9' {
+			break
+		}
+		n = n*10 + uint32(c-'0')
+	}
+	return n
 }
 
 func windowsDeviceModel() string {

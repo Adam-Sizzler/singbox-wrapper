@@ -22,7 +22,7 @@ func appHWID() string {
 	hwidOnce.Do(func() {
 		hwidCache = computeHWID()
 	})
-	return hwidCache
+	return strings.ToLower(hwidCache)
 }
 
 func computeHWID() string {
@@ -59,7 +59,7 @@ func computeHWID() string {
 	}
 
 	sum := md5.Sum([]byte(strings.Join(seedParts, "|")))
-	encoded := strings.ToUpper(hex.EncodeToString(sum[:]))
+	encoded := hex.EncodeToString(sum[:])
 	if len(encoded) < 32 {
 		return encoded
 	}

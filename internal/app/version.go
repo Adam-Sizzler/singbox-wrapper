@@ -9,7 +9,7 @@ import (
 
 const (
 	appReleaseBaseURL = "https://github.com/Adam-Sizzler/singbox-wrapper/releases/tag/"
-	appUserAgentBase  = "sfw"
+	appUserAgentBase  = "SFW"
 )
 
 // appReleaseTag is injected at build time via -ldflags -X.

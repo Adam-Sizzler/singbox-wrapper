@@ -184,10 +184,20 @@ func validateRemoteRuntimeConfigWithTimeout(url string, timeout time.Duration) e
 }
 
 func subscriptionRequestHeaders() map[string]string {
-	// Keep subscription fetch behavior stable: runtime config providers are
-	// expected to rely on User-Agent only.
+	metadata := appDeviceMetadata()
 	return map[string]string{
-		"User-Agent": appUserAgent(),
+		"User-Agent":             metadata.UserAgent,
+		"X-HWID":                 metadata.HWID,
+		"X-Device-OS":            metadata.Platform,
+		"X-Ver-OS":               metadata.OSVersion,
+		"X-Device-Model":         metadata.DeviceModel,
+		"X-App-Version":          metadata.AppVersion,
+		"X-HWID-Platform":        metadata.Platform,
+		"X-HWID-OS-Version":      metadata.OSVersion,
+		"X-HWID-Device-Model":    metadata.DeviceModel,
+		"X-HWID-User-Agent":      metadata.UserAgent,
+		"X-Exodus-Client-Type":   "singbox-wrapper",
+		"X-Singbox-Wrapper-HWID": metadata.HWID,
 	}
 }
 

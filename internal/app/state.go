@@ -70,6 +70,7 @@ type App struct {
 	selectorCacheLive      bool
 	selectorCacheExpiresAt time.Time
 	selectorCacheGroups    []SelectorGroupState
+	selectorDelayCache     map[string]SelectorOptionDelayState
 
 	runMu         sync.Mutex
 	runningAction bool
@@ -141,6 +142,7 @@ type AppState struct {
 	URL                 string               `json:"url"`
 	Version             string               `json:"version"`
 	SelectorGroups      []SelectorGroupState `json:"selector_groups,omitempty"`
+	SelectorCollapsed   map[string]bool      `json:"selector_collapsed_groups,omitempty"`
 	AutoUpdateHours     int                  `json:"auto_update_hours"`
 	AutoStartCore       bool                 `json:"auto_start_core"`
 	StartMinimizedTray  bool                 `json:"start_minimized_to_tray"`
@@ -148,6 +150,7 @@ type AppState struct {
 	UptimeSeconds       int64                `json:"uptime_seconds"`
 	Running             bool                 `json:"running"`
 	Busy                bool                 `json:"busy"`
+	AllowInsecure       bool                 `json:"allow_insecure"`
 	ProtoRegWarn        string               `json:"proto_reg_warn,omitempty"`
 	AppReleaseTag       string               `json:"app_release_tag,omitempty"`
 	AppReleaseURL       string               `json:"app_release_url,omitempty"`
@@ -224,6 +227,7 @@ func (a *App) snapshotState() AppState {
 		URL:                 active.URL,
 		Version:             active.Version,
 		SelectorGroups:      selectorGroups,
+		SelectorCollapsed:   cloneSelectorCollapsedGroups(active.SelectorCollapsedGroups),
 		AutoUpdateHours:     cfg.AutoUpdateHours,
 		AutoStartCore:       cfg.AutoStartCore,
 		StartMinimizedTray:  cfg.StartMinimizedToTray,
@@ -231,6 +235,7 @@ func (a *App) snapshotState() AppState {
 		UptimeSeconds:       a.processUptimeSeconds(),
 		Running:             running,
 		Busy:                busy,
+		AllowInsecure:       cfg.AllowInsecure,
 		ProtoRegWarn:        a.protoRegWarn,
 		AppReleaseTag:       currentAppReleaseTag(),
 		AppReleaseURL:       currentAppReleaseURL(),
@@ -241,14 +246,16 @@ func (a *App) snapshotState() AppState {
 }
 
 type StatePatch struct {
-	CurrentProfile       *string `json:"current_profile"`
-	Language             *string `json:"language"`
-	ThemeMode            *string `json:"theme_mode"`
-	URL                  *string `json:"url"`
-	Version              *string `json:"version"`
-	AutoUpdateHours      *int    `json:"auto_update_hours"`
-	AutoStartCore        *bool   `json:"auto_start_core"`
-	StartMinimizedToTray *bool   `json:"start_minimized_to_tray"`
+	CurrentProfile       *string         `json:"current_profile"`
+	Language             *string         `json:"language"`
+	ThemeMode            *string         `json:"theme_mode"`
+	URL                  *string         `json:"url"`
+	Version              *string         `json:"version"`
+	AutoUpdateHours      *int            `json:"auto_update_hours"`
+	AutoStartCore        *bool           `json:"auto_start_core"`
+	StartMinimizedToTray *bool           `json:"start_minimized_to_tray"`
+	AllowInsecure        *bool           `json:"allow_insecure"`
+	SelectorCollapsed    map[string]bool `json:"selector_collapsed_groups"`
 }
 
 func (a *App) applyStatePatch(p StatePatch) error {
@@ -283,6 +290,9 @@ func (a *App) applyStatePatch(p StatePatch) error {
 	if p.StartMinimizedToTray != nil {
 		cfg.StartMinimizedToTray = *p.StartMinimizedToTray
 	}
+	if p.AllowInsecure != nil {
+		cfg.AllowInsecure = *p.AllowInsecure
+	}
 
 	idx := activeProfileIndex(&cfg)
 	if idx < 0 {
@@ -298,6 +308,9 @@ func (a *App) applyStatePatch(p StatePatch) error {
 			version = "latest"
 		}
 		cfg.Profiles[idx].Version = version
+	}
+	if p.SelectorCollapsed != nil {
+		cfg.Profiles[idx].SelectorCollapsedGroups = normalizeSelectorCollapsedGroups(p.SelectorCollapsed)
 	}
 
 	syncLegacyFromCurrent(&cfg)

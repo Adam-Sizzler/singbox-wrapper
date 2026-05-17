@@ -125,8 +125,8 @@
                 </div>
 
                 <div class="field-row" id="selectorBlock">
-                  <label class="field-label" id="labelSelector">Селектор:</label>
-                  <div class="field-control">
+                  <label class="field-label" id="labelSelector">Селекторы:</label>
+                  <div class="field-control selector-control">
                     <div id="selectorGroups" class="selector-groups"></div>
                   </div>
                 </div>
@@ -295,6 +295,17 @@
                     </label>
                   </div>
                 </div>
+
+                <div class="field-row startup-row">
+                  <label class="field-label startup-row-label" id="labelInsecureToggle" for="allowInsecure">Разрешить небезопасные ссылки</label>
+                  <div class="field-control startup-row-control">
+                    <label class="startup-toggle" for="allowInsecure">
+                      <input id="allowInsecure" class="startup-toggle-input" type="checkbox">
+                      <span class="startup-toggle-ui" aria-hidden="true"></span>
+                    </label>
+                  </div>
+                </div>
+
               </article>
             </div>
           </div>

@@ -99,7 +99,7 @@ func (a *App) checkConfigAction() error {
 			return nil
 		}
 
-		if err := validateRemoteRuntimeConfigWithTimeout(resolvedConfigURL, uiConfigActionTimeout); err != nil {
+		if err := validateRemoteRuntimeConfigWithOptions(resolvedConfigURL, uiConfigActionTimeout, cfg.AllowInsecure); err != nil {
 			return err
 		}
 		a.log("Проверка конфигурации OK: URL доступен и JSON валиден (профиль: %s)", profileName)
@@ -263,9 +263,10 @@ func (a *App) refreshRuntimeConfigFromURL(url, runtimeCfgPath string) (bool, err
 }
 
 func (a *App) refreshRuntimeConfigFromURLWithTimeout(url, runtimeCfgPath string, timeout time.Duration) (bool, error) {
+	cfg := a.getConfigSnapshot()
 	a.runtimeCfgMu.Lock()
 	defer a.runtimeCfgMu.Unlock()
-	return downloadRuntimeConfigWithTimeout(url, runtimeCfgPath, timeout)
+	return downloadRuntimeConfigWithOptions(url, runtimeCfgPath, timeout, cfg.AllowInsecure)
 }
 
 func (a *App) ensureSingBox(targetVersion string) error {

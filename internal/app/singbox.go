@@ -6,6 +6,7 @@ import (
 	"archive/zip"
 	"bytes"
 	"context"
+	"crypto/tls"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -105,13 +106,17 @@ func downloadAndInstallSingBox(version, targetExe string) error {
 }
 
 func downloadRuntimeConfig(url, target string) (bool, error) {
-	return downloadRuntimeConfigWithTimeout(url, target, 0)
+	return downloadRuntimeConfigWithOptions(url, target, 0, false)
 }
 
 func downloadRuntimeConfigWithTimeout(url, target string, timeout time.Duration) (bool, error) {
+	return downloadRuntimeConfigWithOptions(url, target, timeout, false)
+}
+
+func downloadRuntimeConfigWithOptions(url, target string, timeout time.Duration, allowInsecure bool) (bool, error) {
 	targetName := filepath.Base(target)
 	tmpPath := target + ".download.tmp"
-	if err := downloadFileWithTimeout(url, tmpPath, subscriptionRequestHeaders(), timeout); err != nil {
+	if err := downloadFileWithOptions(url, tmpPath, subscriptionRequestHeaders(), timeout, allowInsecure); err != nil {
 		return false, fmt.Errorf("не удалось скачать %s: %w", targetName, err)
 	}
 	defer os.Remove(tmpPath)
@@ -171,12 +176,16 @@ func ensureLocalRuntimeConfig(target string) error {
 }
 
 func validateRemoteRuntimeConfig(url string) error {
-	return validateRemoteRuntimeConfigWithTimeout(url, 0)
+	return validateRemoteRuntimeConfigWithOptions(url, 0, false)
 }
 
 func validateRemoteRuntimeConfigWithTimeout(url string, timeout time.Duration) error {
+	return validateRemoteRuntimeConfigWithOptions(url, timeout, false)
+}
+
+func validateRemoteRuntimeConfigWithOptions(url string, timeout time.Duration, allowInsecure bool) error {
 	tmpPath := filepath.Join(os.TempDir(), fmt.Sprintf("singbox-wrapper-config-check-%d.json", time.Now().UnixNano()))
-	if err := downloadFileWithTimeout(url, tmpPath, subscriptionRequestHeaders(), timeout); err != nil {
+	if err := downloadFileWithOptions(url, tmpPath, subscriptionRequestHeaders(), timeout, allowInsecure); err != nil {
 		return fmt.Errorf("не удалось скачать runtime-конфиг: %w", err)
 	}
 	defer os.Remove(tmpPath)
@@ -212,10 +221,14 @@ func validateRuntimeConfigFile(path string) error {
 }
 
 func downloadFile(url, target string, headers map[string]string) error {
-	return downloadFileWithTimeout(url, target, headers, 0)
+	return downloadFileWithOptions(url, target, headers, 0, false)
 }
 
 func downloadFileWithTimeout(url, target string, headers map[string]string, timeout time.Duration) error {
+	return downloadFileWithOptions(url, target, headers, timeout, false)
+}
+
+func downloadFileWithOptions(url, target string, headers map[string]string, timeout time.Duration, allowInsecure bool) error {
 	if timeout <= 0 {
 		timeout = defaultDownloadTimeout
 	}
@@ -235,20 +248,24 @@ func downloadFileWithTimeout(url, target string, headers map[string]string, time
 	if dialTimeout < time.Second {
 		dialTimeout = time.Second
 	}
+	transport := &http.Transport{
+		Proxy: http.ProxyFromEnvironment,
+		DialContext: (&net.Dialer{
+			Timeout:   dialTimeout,
+			KeepAlive: 30 * time.Second,
+		}).DialContext,
+		TLSHandshakeTimeout:   dialTimeout,
+		ResponseHeaderTimeout: timeout,
+		ExpectContinueTimeout: time.Second,
+		IdleConnTimeout:       30 * time.Second,
+		ForceAttemptHTTP2:     true,
+	}
+	if allowInsecure {
+		transport.TLSClientConfig = &tls.Config{InsecureSkipVerify: true} //nolint:gosec // User-enabled setting for self-signed subscription endpoints.
+	}
 	client := &http.Client{
-		Timeout: timeout,
-		Transport: &http.Transport{
-			Proxy: http.ProxyFromEnvironment,
-			DialContext: (&net.Dialer{
-				Timeout:   dialTimeout,
-				KeepAlive: 30 * time.Second,
-			}).DialContext,
-			TLSHandshakeTimeout:   dialTimeout,
-			ResponseHeaderTimeout: timeout,
-			ExpectContinueTimeout: time.Second,
-			IdleConnTimeout:       30 * time.Second,
-			ForceAttemptHTTP2:     true,
-		},
+		Timeout:   timeout,
+		Transport: transport,
 	}
 	resp, err := client.Do(req)
 	if err != nil {

@@ -33,6 +33,7 @@ type AppConfig struct {
 	AutoUpdateHours      int               `yaml:"auto_update_hours,omitempty"`
 	AutoStartCore        bool              `yaml:"auto_start_core,omitempty"`
 	StartMinimizedToTray bool              `yaml:"start_minimized_to_tray,omitempty"`
+	AllowInsecure        bool              `yaml:"allow_insecure,omitempty" json:"allow_insecure"`
 	Language             string            `yaml:"language,omitempty"`
 	ThemeMode            string            `yaml:"theme_mode,omitempty"`
 	CurrentProfile       string            `yaml:"current_profile,omitempty"`
@@ -44,6 +45,7 @@ type appConfigPersist struct {
 	AutoUpdateHours      int               `yaml:"auto_update_hours"`
 	AutoStartCore        bool              `yaml:"auto_start_core"`
 	StartMinimizedToTray bool              `yaml:"start_minimized_to_tray"`
+	AllowInsecure        bool              `yaml:"allow_insecure,omitempty"`
 	Language             string            `yaml:"language"`
 	ThemeMode            string            `yaml:"theme_mode"`
 	CurrentProfile       string            `yaml:"current_profile"`
@@ -58,6 +60,7 @@ func (c AppConfig) MarshalYAML() (interface{}, error) {
 		AutoUpdateHours:      cfg.AutoUpdateHours,
 		AutoStartCore:        cfg.AutoStartCore,
 		StartMinimizedToTray: cfg.StartMinimizedToTray,
+		AllowInsecure:        cfg.AllowInsecure,
 		Language:             cfg.Language,
 		ThemeMode:            cfg.ThemeMode,
 		CurrentProfile:       cfg.CurrentProfile,

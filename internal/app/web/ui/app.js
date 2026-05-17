@@ -52,6 +52,7 @@
   var labelAutoUpdateNode = document.getElementById("labelAutoUpdate");
   var labelAutoStartCoreNode = document.getElementById("labelAutoStartCore");
   var labelStartMinimizedTrayNode = document.getElementById("labelStartMinimizedTray");
+  var labelInsecureToggleNode = document.getElementById("labelInsecureToggle");
   var labelProfileNode = document.getElementById("labelProfile");
   var labelSelectorNode = document.getElementById("labelSelector");
   var labelRunCheckNode = document.getElementById("labelRunCheck");
@@ -92,7 +93,9 @@
   var screenProfilesNode = document.getElementById("screenProfiles");
   var screenLogsNode = document.getElementById("screenLogs");
   var screenSettingsNode = document.getElementById("screenSettings");
-
+  var allowInsecureInput = document.getElementById("allowInsecure");
+  
+  var lastAllowInsecure = false;
   var lastLogId = 0;
   var stateTimer = null;
   var logsTimer = null;
@@ -191,6 +194,7 @@
       autoUpdate: "Автообновление (часы):",
       autoStartCore: "Автозапуск ядра",
       startMinimizedTray: "Запуск в трее",
+      allowInsecure: "Разр. небезопасные",
       profile: "Профиль:",
       selector: "Селектор:",
       selectorEmpty: "Нет доступных селекторов",
@@ -256,6 +260,7 @@
       autoUpdate: "Auto-update (hours):",
       autoStartCore: "Auto start core",
       startMinimizedTray: "Start in tray",
+      allowInsecure: "Allow insecure",
       profile: "Profile:",
       selector: "Selector:",
       selectorEmpty: "No selectors available",
@@ -679,6 +684,7 @@
     if (labelAutoUpdateNode) labelAutoUpdateNode.textContent = tr("autoUpdate");
     if (labelAutoStartCoreNode) labelAutoStartCoreNode.textContent = tr("autoStartCore");
     if (labelStartMinimizedTrayNode) labelStartMinimizedTrayNode.textContent = tr("startMinimizedTray");
+    if (labelInsecureToggleNode) labelInsecureToggleNode.textContent = tr("allowInsecure");
     if (labelProfileNode) labelProfileNode.textContent = tr("profile");
     if (labelSelectorNode) labelSelectorNode.textContent = tr("selector");
     if (labelRunCheckNode) labelRunCheckNode.textContent = tr("runCheck");
@@ -1797,11 +1803,29 @@
       }
     }
 
+    if (allowInsecureInput) {
+      lastAllowInsecure = !!state.allow_insecure;
+      allowInsecureInput.checked = lastAllowInsecure;
+    }
+    
     lastProtoWarn = state.proto_reg_warn || "";
     renderDefaultStatus(lastProtoWarn);
 
     revealUIAfterInitialState();
     loadingState = false;
+  }
+
+  if (allowInsecureInput) {
+    allowInsecureInput.onchange = function () {
+      lastAllowInsecure = allowInsecureInput.checked;
+      api("POST", "/api/state", { allow_insecure: lastAllowInsecure }, function(err, state) {
+        if (err) {
+          setStatus(tr("errorPrefix") + err.message);
+          return;
+        }
+        renderState(state);
+      });
+    };
   }
 
   function refreshState(force) {

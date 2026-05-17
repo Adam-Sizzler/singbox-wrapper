@@ -148,6 +148,7 @@ type AppState struct {
 	UptimeSeconds       int64                `json:"uptime_seconds"`
 	Running             bool                 `json:"running"`
 	Busy                bool                 `json:"busy"`
+	AllowInsecure       bool                 `json:"allow_insecure"`
 	ProtoRegWarn        string               `json:"proto_reg_warn,omitempty"`
 	AppReleaseTag       string               `json:"app_release_tag,omitempty"`
 	AppReleaseURL       string               `json:"app_release_url,omitempty"`
@@ -231,6 +232,7 @@ func (a *App) snapshotState() AppState {
 		UptimeSeconds:       a.processUptimeSeconds(),
 		Running:             running,
 		Busy:                busy,
+		AllowInsecure:       cfg.AllowInsecure,
 		ProtoRegWarn:        a.protoRegWarn,
 		AppReleaseTag:       currentAppReleaseTag(),
 		AppReleaseURL:       currentAppReleaseURL(),
@@ -249,6 +251,7 @@ type StatePatch struct {
 	AutoUpdateHours      *int    `json:"auto_update_hours"`
 	AutoStartCore        *bool   `json:"auto_start_core"`
 	StartMinimizedToTray *bool   `json:"start_minimized_to_tray"`
+	AllowInsecure        *bool   `json:"allow_insecure"`
 }
 
 func (a *App) applyStatePatch(p StatePatch) error {
@@ -282,6 +285,9 @@ func (a *App) applyStatePatch(p StatePatch) error {
 	}
 	if p.StartMinimizedToTray != nil {
 		cfg.StartMinimizedToTray = *p.StartMinimizedToTray
+	}
+	if p.AllowInsecure != nil {
+		cfg.AllowInsecure = *p.AllowInsecure
 	}
 
 	idx := activeProfileIndex(&cfg)

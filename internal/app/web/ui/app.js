@@ -74,6 +74,8 @@
   var profilesTitleNode = document.getElementById("profilesTitle");
   var homeActionsTitleNode = document.getElementById("homeActionsTitle");
   var homeProfileRowNode = document.getElementById("homeProfileRow");
+  var homeProfileLabelNode = document.getElementById("homeProfileLabel");
+  var homeSelectorLabelNode = document.getElementById("homeSelectorLabel");
   var profilesActionsTitleNode = document.getElementById("profilesActionsTitle");
   var labelProfileActionsNode = document.getElementById("labelProfileActions");
   var labelProfileListNode = document.getElementById("labelProfileList");
@@ -192,6 +194,9 @@
       autoStartCore: "Автозапуск ядра",
       startMinimizedTray: "Запуск в трее",
       allowInsecure: "Разр. небезопасные",
+      homeProfileLabel: "Профиль",
+      homeSelectorLabel: "Селектор",
+      selectorEmpty: "Нет доступных селекторов",
       selectorPing: "Пинг",
       selectorPingTitle: "Проверить задержку",
       selectorPingBusy: "...",
@@ -259,6 +264,9 @@
       autoStartCore: "Auto start core",
       startMinimizedTray: "Start in tray",
       allowInsecure: "Allow insecure",
+      homeProfileLabel: "Profile",
+      homeSelectorLabel: "Selector",
+      selectorEmpty: "No selectors available",
       selectorPing: "Ping",
       selectorPingTitle: "Check delay",
       selectorPingBusy: "...",
@@ -679,6 +687,8 @@
     if (settingsTitleNode) settingsTitleNode.textContent = tr("settings");
     if (logsTitleNode) logsTitleNode.textContent = tr("logs");
     if (homeActionsTitleNode) homeActionsTitleNode.textContent = tr("homeActions");
+    if (homeProfileLabelNode) homeProfileLabelNode.textContent = tr("homeProfileLabel");
+    if (homeSelectorLabelNode) homeSelectorLabelNode.textContent = tr("homeSelectorLabel");
     if (profilesActionsTitleNode) profilesActionsTitleNode.textContent = tr("profileActions");
     if (labelProfileActionsNode) labelProfileActionsNode.textContent = tr("profileActionsLabel");
     if (labelProfileListNode) labelProfileListNode.textContent = tr("profileListLabel");

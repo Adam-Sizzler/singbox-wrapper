@@ -191,14 +191,7 @@
       autoUpdate: "Автообновление (часы):",
       autoStartCore: "Автозапуск ядра",
       startMinimizedTray: "Запуск в трее",
-<<<<<<< HEAD
       allowInsecure: "Разр. небезопасные",
-      profile: "Профиль:",
-      selector: "Селекторы:",
-      selectorEmpty: "Нет доступных селекторов",
-=======
-      allowInsecure: "Разрешить небезопасные ссылки",
->>>>>>> a68259d (26.5.18)
       selectorPing: "Пинг",
       selectorPingTitle: "Проверить задержку",
       selectorPingBusy: "...",
@@ -265,14 +258,7 @@
       autoUpdate: "Auto-update (hours):",
       autoStartCore: "Auto start core",
       startMinimizedTray: "Start in tray",
-<<<<<<< HEAD
       allowInsecure: "Allow insecure",
-      profile: "Profile:",
-      selector: "Selectors:",
-      selectorEmpty: "No selectors available",
-=======
-      allowInsecure: "Allow insecure links",
->>>>>>> a68259d (26.5.18)
       selectorPing: "Ping",
       selectorPingTitle: "Check delay",
       selectorPingBusy: "...",

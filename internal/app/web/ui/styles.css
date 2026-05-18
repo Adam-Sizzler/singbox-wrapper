@@ -444,6 +444,15 @@ body.ui-loading .app-shell {
   width: 100%;
 }
 
+.home-field-label {
+  width: 100%;
+  margin: 0 0 var(--ui-space-1-5);
+  color: var(--ui-text);
+  font-size: var(--ui-font-md);
+  font-weight: 650;
+  line-height: 1.2;
+}
+
 .home-dynamic-card .field-row[hidden] {
   display: none;
 }

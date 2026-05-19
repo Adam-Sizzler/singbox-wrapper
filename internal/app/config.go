@@ -15,6 +15,7 @@ import (
 const (
 	defaultAppLanguage   = "ru"
 	defaultThemeMode     = "auto"
+	defaultAccentColor   = "#fdd75a"
 	defaultAutoUpdateHrs = 12
 	maxAutoUpdateHours   = 24 * 365
 )
@@ -36,6 +37,7 @@ type AppConfig struct {
 	AllowInsecure        bool              `yaml:"allow_insecure,omitempty" json:"allow_insecure"`
 	Language             string            `yaml:"language,omitempty"`
 	ThemeMode            string            `yaml:"theme_mode,omitempty"`
+	AccentColor          string            `yaml:"accent_color,omitempty"`
 	CurrentProfile       string            `yaml:"current_profile,omitempty"`
 	Profiles             []ConfigProfile   `yaml:"profiles,omitempty"`
 	SingboxEnv           map[string]string `yaml:"singbox-env,omitempty"`
@@ -48,6 +50,7 @@ type appConfigPersist struct {
 	AllowInsecure        bool              `yaml:"allow_insecure,omitempty"`
 	Language             string            `yaml:"language"`
 	ThemeMode            string            `yaml:"theme_mode"`
+	AccentColor          string            `yaml:"accent_color"`
 	CurrentProfile       string            `yaml:"current_profile"`
 	Profiles             []ConfigProfile   `yaml:"profiles"`
 	SingboxEnv           map[string]string `yaml:"singbox-env,omitempty"`
@@ -63,6 +66,7 @@ func (c AppConfig) MarshalYAML() (interface{}, error) {
 		AllowInsecure:        cfg.AllowInsecure,
 		Language:             cfg.Language,
 		ThemeMode:            cfg.ThemeMode,
+		AccentColor:          cfg.AccentColor,
 		CurrentProfile:       cfg.CurrentProfile,
 		Profiles:             cfg.Profiles,
 		SingboxEnv:           cfg.SingboxEnv,
@@ -133,6 +137,7 @@ func defaultAppConfig() AppConfig {
 		AutoUpdateHours: defaultAutoUpdateHrs,
 		Language:        defaultAppLanguage,
 		ThemeMode:       defaultThemeMode,
+		AccentColor:     defaultAccentColor,
 		CurrentProfile:  "default",
 		SingboxEnv:      cloneEnvMap(defaultSingBoxEnv),
 		Profiles: []ConfigProfile{
@@ -154,6 +159,7 @@ func normalizeConfigProfiles(cfg *AppConfig) {
 	cfg.AutoUpdateHours = normalizeAutoUpdateHours(cfg.AutoUpdateHours)
 	cfg.Language = normalizeAppLanguage(cfg.Language)
 	cfg.ThemeMode = normalizeThemeMode(cfg.ThemeMode)
+	cfg.AccentColor = normalizeAccentColor(cfg.AccentColor)
 	cfg.SingboxEnv = normalizeSingboxEnv(cfg.SingboxEnv)
 
 	if len(cfg.Profiles) == 0 {
@@ -326,6 +332,40 @@ func cloneEnvMap(raw map[string]string) map[string]string {
 	return cloned
 }
 
+func normalizeAccentColor(raw string) string {
+	value := strings.TrimSpace(strings.ToLower(raw))
+	if value == "" {
+		return defaultAccentColor
+	}
+	if len(value) == 4 && value[0] == '#' && isHexColorShort(value[1:]) {
+		return "#" + string(value[1]) + string(value[1]) + string(value[2]) + string(value[2]) + string(value[3]) + string(value[3])
+	}
+	if len(value) == 6 && isHexColor(value) {
+		return "#" + value
+	}
+	if len(value) == 7 && value[0] == '#' && isHexColor(value[1:]) {
+		return value
+	}
+	return defaultAccentColor
+}
+
+func isHexColorShort(s string) bool {
+	if len(s) != 3 {
+		return false
+	}
+	return isHexColor(s)
+}
+
+func isHexColor(s string) bool {
+	for _, r := range s {
+		if (r >= '0' && r <= '9') || (r >= 'a' && r <= 'f') || (r >= 'A' && r <= 'F') {
+			continue
+		}
+		return false
+	}
+	return true
+}
+
 func normalizeAutoUpdateHours(raw int) int {
 	if raw < 0 {
 		return 0
@@ -342,6 +382,7 @@ func syncLegacyFromCurrent(cfg *AppConfig) {
 	}
 	cfg.Language = normalizeAppLanguage(cfg.Language)
 	cfg.ThemeMode = normalizeThemeMode(cfg.ThemeMode)
+	cfg.AccentColor = normalizeAccentColor(cfg.AccentColor)
 	if len(cfg.Profiles) == 0 {
 		cfg.URL = ""
 		cfg.Version = "latest"

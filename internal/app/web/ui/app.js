@@ -53,6 +53,7 @@
   var labelAutoStartCoreNode = document.getElementById("labelAutoStartCore");
   var labelStartMinimizedTrayNode = document.getElementById("labelStartMinimizedTray");
   var labelInsecureToggleNode = document.getElementById("labelInsecureToggle");
+  var labelAccentColorNode = document.getElementById("labelAccentColor");
   var labelCheckConfigNode = document.getElementById("labelCheckConfig");
   var langRuBtn = document.getElementById("langRu");
   var langEnBtn = document.getElementById("langEn");
@@ -92,7 +93,12 @@
   var screenLogsNode = document.getElementById("screenLogs");
   var screenSettingsNode = document.getElementById("screenSettings");
   var allowInsecureInput = document.getElementById("allowInsecure");
+  var accentColorInput = document.getElementById("accentColor");
+  var accentColorSwatchNode = document.getElementById("accentColorSwatch");
+  var accentColorTextNode = document.getElementById("accentColorText");
+  var accentColorResetBtn = document.getElementById("accentColorReset");
 
+  var DEFAULT_ACCENT_COLOR = "#fdd75a";
   var lastAllowInsecure = false;
   var lastLogId = 0;
   var stateTimer = null;
@@ -168,6 +174,10 @@
   var HIRES_UI_HEIGHT_THRESHOLD = 1800;
   var HIRES_UI_SCALE = 0.8;
   var lastDisplayScale = null;
+  var lastAccentColor = DEFAULT_ACCENT_COLOR;
+  var accentColorTimer = null;
+  var accentColorPatchInFlight = false;
+  var accentColorPatchQueued = false;
 
   var I18N = {
     ru: {
@@ -194,6 +204,9 @@
       autoStartCore: "Автозапуск ядра",
       startMinimizedTray: "Запуск в трее",
       allowInsecure: "Разр. небезопасные",
+      accentColor: "Цвет акцента:",
+      accentColorChoose: "Выбрать",
+      accentColorReset: "Сброс",
       homeProfileLabel: "Профиль",
       homeSelectorLabel: "Селектор",
       selectorEmpty: "Нет доступных селекторов",
@@ -264,6 +277,9 @@
       autoStartCore: "Auto start core",
       startMinimizedTray: "Start in tray",
       allowInsecure: "Allow insecure",
+      accentColor: "Accent color:",
+      accentColorChoose: "Choose",
+      accentColorReset: "Reset",
       homeProfileLabel: "Profile",
       homeSelectorLabel: "Selector",
       selectorEmpty: "No selectors available",
@@ -424,6 +440,114 @@
     return "auto";
   }
 
+  function normalizeHexColor(raw) {
+    var value = String(raw || "").trim().toLowerCase();
+    if (/^#[0-9a-f]{6}$/.test(value)) return value;
+    if (/^[0-9a-f]{6}$/.test(value)) return "#" + value;
+    if (/^#[0-9a-f]{3}$/.test(value)) {
+      return "#" + value.charAt(1) + value.charAt(1) + value.charAt(2) + value.charAt(2) + value.charAt(3) + value.charAt(3);
+    }
+    return DEFAULT_ACCENT_COLOR;
+  }
+
+  function hexToRgb(hex) {
+    var normalized = normalizeHexColor(hex).slice(1);
+    return {
+      r: parseInt(normalized.slice(0, 2), 16),
+      g: parseInt(normalized.slice(2, 4), 16),
+      b: parseInt(normalized.slice(4, 6), 16)
+    };
+  }
+
+  function rgbToHex(r, g, b) {
+    function clamp(v) {
+      v = Math.round(v);
+      if (v < 0) return 0;
+      if (v > 255) return 255;
+      return v;
+    }
+    function part(v) {
+      return clamp(v).toString(16).padStart(2, "0");
+    }
+    return "#" + part(r) + part(g) + part(b);
+  }
+
+  function mixHexColor(hex, targetHex, weight) {
+    var base = hexToRgb(hex);
+    var target = hexToRgb(targetHex);
+    var w = Math.max(0, Math.min(1, weight));
+    return rgbToHex(
+      base.r + (target.r - base.r) * w,
+      base.g + (target.g - base.g) * w,
+      base.b + (target.b - base.b) * w
+    );
+  }
+
+  function accentTextColor(hex) {
+    var rgb = hexToRgb(hex);
+    var luminance = (rgb.r * 299 + rgb.g * 587 + rgb.b * 114) / 1000;
+    return luminance >= 150 ? "#1f1f1f" : "#ffffff";
+  }
+
+  function applyAccentColor(raw) {
+    var accent = normalizeHexColor(raw);
+    lastAccentColor = accent;
+    var text = accentTextColor(accent);
+    var hover = mixHexColor(accent, "#ffffff", 0.12);
+    var active = mixHexColor(accent, "#000000", 0.14);
+    var dark = mixHexColor(accent, "#000000", 0.28);
+    var light = mixHexColor(accent, "#ffffff", 0.18);
+    var targets = [document.documentElement, document.body];
+    for (var i = 0; i < targets.length; i++) {
+      if (!targets[i] || !targets[i].style) continue;
+      targets[i].style.setProperty("--ui-accent", accent);
+      targets[i].style.setProperty("--ui-accent-text", text);
+      targets[i].style.setProperty("--ui-accent-hover", hover);
+      targets[i].style.setProperty("--ui-accent-active", active);
+      targets[i].style.setProperty("--ui-startstop-outer", "linear-gradient(315deg, " + light + " 0%, " + accent + " 45%, " + dark + " 100%)");
+      targets[i].style.setProperty("--ui-startstop-inner", "linear-gradient(145deg, " + light + " 0%, " + accent + " 48%, " + dark + " 100%)");
+    }
+    if (accentColorInput && document.activeElement !== accentColorInput) {
+      accentColorInput.value = accent;
+    }
+    if (accentColorSwatchNode) {
+      accentColorSwatchNode.style.background = accent;
+    }
+    return accent;
+  }
+
+  function persistAccentColorNow() {
+    var color = normalizeHexColor(lastAccentColor);
+    if (accentColorPatchInFlight) {
+      accentColorPatchQueued = true;
+      return;
+    }
+    accentColorPatchInFlight = true;
+    api("POST", "/api/state", { accent_color: color }, function (err, state) {
+      accentColorPatchInFlight = false;
+      if (err) {
+        setStatus(tr("errorPrefix") + err.message);
+        refreshState(true);
+      } else {
+        renderState(state);
+      }
+      if (accentColorPatchQueued) {
+        accentColorPatchQueued = false;
+        persistAccentColorNow();
+      }
+    });
+  }
+
+  function scheduleAccentColorPersist() {
+    if (accentColorTimer) {
+      clearTimeout(accentColorTimer);
+    }
+    accentColorTimer = setTimeout(function () {
+      accentColorTimer = null;
+      persistAccentColorNow();
+    }, 250);
+  }
+
   function themeModeLabel(mode) {
     var normalized = normalizeThemeMode(mode);
     if (normalized === "light") return tr("themeLight");
@@ -488,6 +612,7 @@
       currentThemeDark = true;
     }
     applyThemeAppearance();
+    applyAccentColor(lastAccentColor);
     applyThemeModeControls();
 
     if (!persist) {
@@ -704,6 +829,9 @@
     if (labelAutoStartCoreNode) labelAutoStartCoreNode.textContent = tr("autoStartCore");
     if (labelStartMinimizedTrayNode) labelStartMinimizedTrayNode.textContent = tr("startMinimizedTray");
     if (labelInsecureToggleNode) labelInsecureToggleNode.textContent = tr("allowInsecure");
+    if (labelAccentColorNode) labelAccentColorNode.textContent = tr("accentColor");
+    if (accentColorTextNode) accentColorTextNode.textContent = tr("accentColorChoose");
+    if (accentColorResetBtn) accentColorResetBtn.textContent = tr("accentColorReset");
     if (labelCheckConfigNode) labelCheckConfigNode.textContent = tr("checkConfigLabel");
     if (checkConfigBtn) checkConfigBtn.textContent = tr("checkConfig");
     if (refreshConfigBtn) refreshConfigBtn.textContent = tr("refreshConfig");
@@ -1873,6 +2001,11 @@
       currentThemeDark = currentThemeMode === "dark" ? true : (currentThemeMode === "light" ? false : currentThemeDark);
     }
     applyThemeAppearance();
+    var nextAccentColor = state.accent_color || lastAccentColor;
+    if (accentColorInput && document.activeElement === accentColorInput && (accentColorTimer || accentColorPatchInFlight)) {
+      nextAccentColor = lastAccentColor;
+    }
+    applyAccentColor(nextAccentColor);
     applyThemeModeControls();
 
     var active = state.current_profile || "";
@@ -1983,6 +2116,32 @@
 
     revealUIAfterInitialState();
     loadingState = false;
+  }
+
+  if (accentColorInput) {
+    accentColorInput.oninput = function () {
+      applyAccentColor(accentColorInput.value);
+      scheduleAccentColorPersist();
+    };
+    accentColorInput.onchange = function () {
+      applyAccentColor(accentColorInput.value);
+      if (accentColorTimer) {
+        clearTimeout(accentColorTimer);
+        accentColorTimer = null;
+      }
+      persistAccentColorNow();
+    };
+  }
+
+  if (accentColorResetBtn) {
+    accentColorResetBtn.onclick = function () {
+      if (accentColorTimer) {
+        clearTimeout(accentColorTimer);
+        accentColorTimer = null;
+      }
+      applyAccentColor(DEFAULT_ACCENT_COLOR);
+      persistAccentColorNow();
+    };
   }
 
   if (allowInsecureInput) {

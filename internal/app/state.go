@@ -138,6 +138,7 @@ type AppState struct {
 	Language            string               `json:"language"`
 	ThemeMode           string               `json:"theme_mode"`
 	ThemeDark           bool                 `json:"theme_dark"`
+	AccentColor         string               `json:"accent_color"`
 	HWID                string               `json:"hwid"`
 	URL                 string               `json:"url"`
 	Version             string               `json:"version"`
@@ -223,6 +224,7 @@ func (a *App) snapshotState() AppState {
 		Language:            cfg.Language,
 		ThemeMode:           themeMode,
 		ThemeDark:           themeDark,
+		AccentColor:         normalizeAccentColor(cfg.AccentColor),
 		HWID:                appHWID(),
 		URL:                 active.URL,
 		Version:             active.Version,
@@ -249,6 +251,7 @@ type StatePatch struct {
 	CurrentProfile       *string         `json:"current_profile"`
 	Language             *string         `json:"language"`
 	ThemeMode            *string         `json:"theme_mode"`
+	AccentColor          *string         `json:"accent_color"`
 	URL                  *string         `json:"url"`
 	Version              *string         `json:"version"`
 	AutoUpdateHours      *int            `json:"auto_update_hours"`
@@ -280,6 +283,9 @@ func (a *App) applyStatePatch(p StatePatch) error {
 	if p.ThemeMode != nil {
 		cfg.ThemeMode = normalizeThemeMode(*p.ThemeMode)
 		themeModeChanged = true
+	}
+	if p.AccentColor != nil {
+		cfg.AccentColor = normalizeAccentColor(*p.AccentColor)
 	}
 	if p.AutoUpdateHours != nil {
 		cfg.AutoUpdateHours = normalizeAutoUpdateHours(*p.AutoUpdateHours)

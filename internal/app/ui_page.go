@@ -8,33 +8,51 @@ import (
 )
 
 const (
-	uiStylesTag = `<link rel="stylesheet" href="/styles.css">`
-	uiScriptTag = `<script src="/app.js"></script>`
+	uiStylesTagPrefix = `<link rel="stylesheet" href="/`
+	uiStylesTagSuffix = `">`
+	uiScriptTagPrefix = `<script src="/`
+	uiScriptTagSuffix = `"></script>`
 )
+
+var uiStyleFiles = []string{
+	"theme.css",
+	"styles.css",
+	"traffic.css",
+}
+
+var uiScriptFiles = []string{
+	"traffic.js",
+	"app.js",
+}
 
 func loadEmbeddedUIHTML() (string, error) {
 	indexBytes, err := uiAssets.ReadFile("web/ui/index.html")
 	if err != nil {
 		return "", fmt.Errorf("read index.html: %w", err)
 	}
-	stylesBytes, err := uiAssets.ReadFile("web/ui/styles.css")
-	if err != nil {
-		return "", fmt.Errorf("read styles.css: %w", err)
-	}
-	scriptBytes, err := uiAssets.ReadFile("web/ui/app.js")
-	if err != nil {
-		return "", fmt.Errorf("read app.js: %w", err)
-	}
-
 	html := string(indexBytes)
-	if !strings.Contains(html, uiStylesTag) {
-		return "", fmt.Errorf("styles tag not found in index.html")
-	}
-	if !strings.Contains(html, uiScriptTag) {
-		return "", fmt.Errorf("script tag not found in index.html")
+	for _, fileName := range uiStyleFiles {
+		tag := uiStylesTagPrefix + fileName + uiStylesTagSuffix
+		if !strings.Contains(html, tag) {
+			return "", fmt.Errorf("%s tag not found in index.html", fileName)
+		}
+		fileBytes, err := uiAssets.ReadFile("web/ui/" + fileName)
+		if err != nil {
+			return "", fmt.Errorf("read %s: %w", fileName, err)
+		}
+		html = strings.Replace(html, tag, "<style>\n"+string(fileBytes)+"\n</style>", 1)
 	}
 
-	html = strings.Replace(html, uiStylesTag, "<style>\n"+string(stylesBytes)+"\n</style>", 1)
-	html = strings.Replace(html, uiScriptTag, "<script>\n"+string(scriptBytes)+"\n</script>", 1)
+	for _, fileName := range uiScriptFiles {
+		tag := uiScriptTagPrefix + fileName + uiScriptTagSuffix
+		if !strings.Contains(html, tag) {
+			return "", fmt.Errorf("%s tag not found in index.html", fileName)
+		}
+		fileBytes, err := uiAssets.ReadFile("web/ui/" + fileName)
+		if err != nil {
+			return "", fmt.Errorf("read %s: %w", fileName, err)
+		}
+		html = strings.Replace(html, tag, "<script>\n"+string(fileBytes)+"\n</script>", 1)
+	}
 	return html, nil
 }

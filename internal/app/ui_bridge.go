@@ -61,6 +61,8 @@ func (a *App) handleUIBridgeCall(req uiBridgeRequest) (any, error) {
 		switch routePath {
 		case "/api/state":
 			return a.snapshotState(), nil
+		case "/api/traffic":
+			return a.trafficSnapshot(), nil
 		case "/api/logs":
 			fromID := int64(0)
 			if s := strings.TrimSpace(parsedPath.Query().Get("from")); s != "" {

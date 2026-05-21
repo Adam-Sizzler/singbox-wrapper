@@ -5,7 +5,9 @@
   <meta http-equiv="X-UA-Compatible" content="IE=edge">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>singbox-wrapper</title>
+  <link rel="stylesheet" href="/theme.css">
   <link rel="stylesheet" href="/styles.css">
+  <link rel="stylesheet" href="/traffic.css">
 </head>
 <body class="ui-loading">
   <div class="app-shell">
@@ -95,6 +97,8 @@
                 <div class="field-row">
                   <div id="status" class="status"></div>
                 </div>
+
+                <div id="trafficStats" class="traffic-stats" hidden></div>
               </article>
 
               <article class="card home-dynamic-card">
@@ -118,7 +122,6 @@
                 </div>
 
                 <div class="field-row home-selector-row" id="selectorBlock" hidden>
-                  <div class="home-field-label" id="homeSelectorLabel">Селектор</div>
                   <div class="field-control selector-control">
                     <div id="selectorGroups" class="selector-groups"></div>
                   </div>
@@ -335,6 +338,7 @@
 
   <div id="toastStack" class="toast-stack" aria-live="polite" aria-atomic="false"></div>
 
+  <script src="/traffic.js"></script>
   <script src="/app.js"></script>
 </body>
 </html>

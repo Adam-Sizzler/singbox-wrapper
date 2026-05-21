@@ -72,6 +72,12 @@ type App struct {
 	selectorCacheGroups    []SelectorGroupState
 	selectorDelayCache     map[string]SelectorOptionDelayState
 
+	trafficMu            sync.Mutex
+	trafficUploadTotal   int64
+	trafficDownloadTotal int64
+	trafficSampleAt      time.Time
+	trafficSampleValid   bool
+
 	runMu         sync.Mutex
 	runningAction bool
 

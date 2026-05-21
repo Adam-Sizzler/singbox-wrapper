@@ -438,6 +438,7 @@ func (a *App) setClashSession(controller, secret, runtimeCfgPath string) {
 	a.clashSecret = strings.TrimSpace(secret)
 	a.clashRuntimeCfg = strings.TrimSpace(runtimeCfgPath)
 	a.clearSelectorCacheLocked()
+	a.resetTrafficSnapshot()
 }
 
 func (a *App) resetClashSession() {
@@ -447,6 +448,7 @@ func (a *App) resetClashSession() {
 	a.clashSecret = ""
 	a.clashRuntimeCfg = ""
 	a.clearSelectorCacheLocked()
+	a.resetTrafficSnapshot()
 }
 
 func (a *App) invalidateSelectorCache() {

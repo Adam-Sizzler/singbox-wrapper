@@ -31,6 +31,7 @@
   var mobileActionCopyLogsBtn = document.getElementById("mobileActionCopyLogs");
   var toastStack = document.getElementById("toastStack");
   var statusNode = document.getElementById("status");
+  var trafficStatsNode = document.getElementById("trafficStats");
   var logsNode = document.getElementById("logs");
   var logsFilterInput = document.getElementById("logsFilter");
   var settingsTitleNode = document.getElementById("settingsTitle");
@@ -103,11 +104,14 @@
   var lastLogId = 0;
   var stateTimer = null;
   var logsTimer = null;
+  var trafficTimer = null;
   var uptimeTimer = null;
   var saveTimer = null;
   var stateReqInFlight = false;
   var stateReqQueued = false;
   var logsReqInFlight = false;
+  var trafficReqInFlight = false;
+  var trafficReqQueued = false;
   var copyLogsInFlight = false;
   var startupPatchInFlight = false;
   var startupPatchQueued = false;
@@ -132,6 +136,7 @@
   var currentLanguage = "ru";
   var lastRunning = false;
   var lastBusy = false;
+  var lastTrafficData = null;
   var appUpdateInFlight = false;
   var lastProtoWarn = "";
   var lastAutoUpdateHours = 12;
@@ -166,13 +171,14 @@
   var LOGS_POLL_MAX_MS = 3200;
   var LOGS_POLL_EMPTY_STEP_MS = 300;
   var LOGS_POLL_ERROR_MS = 4200;
+  var TRAFFIC_POLL_MS = 1000;
   var MAX_RENDERED_LOG_LINES = 2000;
   var MAX_FILTER_PATTERN_LEN = 256;
   var ANSI_ESC_RAW_MARKER = "\x1b[";
   var ANSI_ESC_FALLBACK_MARKER = "\u2190[";
   var HIRES_UI_WIDTH_THRESHOLD = 3200;
   var HIRES_UI_HEIGHT_THRESHOLD = 1800;
-  var HIRES_UI_SCALE = 0.8;
+  var HIRES_UI_SCALE = 0.85;
   var lastDisplayScale = null;
   var lastAccentColor = DEFAULT_ACCENT_COLOR;
   var accentColorTimer = null;
@@ -237,6 +243,8 @@
       statusRunning: "Ядро запущено",
       statusStopped: "Ядро остановлено",
       uptime: "Время работы",
+      upload: "Upload",
+      download: "Download",
       statusLogsCleared: "Логи очищены",
       statusLogsCopied: "Логи скопированы в буфер обмена",
       profilesEmpty: "Профили отсутствуют",
@@ -310,6 +318,8 @@
       statusRunning: "Core is running",
       statusStopped: "Core is stopped",
       uptime: "Uptime",
+      upload: "Upload",
+      download: "Download",
       statusLogsCleared: "Logs cleared",
       statusLogsCopied: "Logs copied to clipboard",
       profilesEmpty: "No profiles",
@@ -511,7 +521,7 @@
       accentColorInput.value = accent;
     }
     if (accentColorSwatchNode) {
-      accentColorSwatchNode.style.background = accent;
+      accentColorSwatchNode.style.background = "";
     }
     return accent;
   }
@@ -863,6 +873,7 @@
     renderUptime(lastUptimeSeconds, lastRunning);
     renderAppVersion(lastAppReleaseTag);
     renderSidebarStatus();
+    renderTrafficStats(null);
     renderAppReleaseMenu(lastAppReleaseTag, lastAppReleaseURL, lastAppUpdateAvailable, lastAppLatestReleaseTag, lastAppLatestReleaseURL);
     renderProfileMenu();
 
@@ -1860,6 +1871,76 @@
     }, logsPollDelay);
   }
 
+  function trafficLabels() {
+    return {
+      upload: tr("upload"),
+      download: tr("download")
+    };
+  }
+
+  function renderTrafficStats(data) {
+    if (data) {
+      lastTrafficData = data;
+    }
+    var renderer = window.SBTrafficUI;
+    if (renderer && typeof renderer.render === "function") {
+      renderer.render(trafficStatsNode, lastTrafficData || {}, lastRunning, trafficLabels());
+      return;
+    }
+    if (trafficStatsNode) {
+      trafficStatsNode.hidden = true;
+    }
+  }
+
+  function scheduleNextTrafficPoll(delayMs) {
+    if (!pollingActive || !lastRunning) return;
+    if (trafficTimer) {
+      clearTimeout(trafficTimer);
+      trafficTimer = null;
+    }
+    var delay = typeof delayMs === "number" ? delayMs : TRAFFIC_POLL_MS;
+    if (delay < 0) delay = 0;
+    trafficTimer = setTimeout(function () {
+      trafficTimer = null;
+      refreshTraffic(false);
+    }, delay);
+  }
+
+  function refreshTraffic(force) {
+    if (!lastRunning) {
+      renderTrafficStats({ available: false });
+      return;
+    }
+    if (document.hidden && !force) {
+      scheduleNextTrafficPoll(TRAFFIC_POLL_MS);
+      return;
+    }
+    if (trafficReqInFlight) {
+      if (force) {
+        trafficReqQueued = true;
+      }
+      return;
+    }
+
+    trafficReqInFlight = true;
+    api("GET", "/api/traffic", null, function (err, data) {
+      trafficReqInFlight = false;
+      if (err) {
+        renderTrafficStats({ available: false });
+      } else {
+        renderTrafficStats(data || {});
+      }
+
+      if (trafficReqQueued) {
+        trafficReqQueued = false;
+        refreshTraffic(true);
+        return;
+      }
+
+      scheduleNextTrafficPoll(TRAFFIC_POLL_MS);
+    });
+  }
+
   function startUptimeTicker() {
     if (uptimeTimer) return;
     uptimeTimer = setInterval(function () {
@@ -1883,6 +1964,7 @@
     }
     scheduleNextStatePoll(computeStatePollDelay());
     scheduleNextLogsPoll(logsPollDelay);
+    scheduleNextTrafficPoll(0);
     startUptimeTicker();
   }
 
@@ -1895,6 +1977,10 @@
     if (logsTimer) {
       clearTimeout(logsTimer);
       logsTimer = null;
+    }
+    if (trafficTimer) {
+      clearTimeout(trafficTimer);
+      trafficTimer = null;
     }
     stopUptimeTicker();
   }
@@ -2113,6 +2199,13 @@
 
     lastProtoWarn = state.proto_reg_warn || "";
     renderDefaultStatus(lastProtoWarn);
+    if (!lastRunning) {
+      renderTrafficStats({ available: false });
+    } else if (!prevRunning || !trafficTimer) {
+      refreshTraffic(true);
+    } else {
+      renderTrafficStats(null);
+    }
 
     revealUIAfterInitialState();
     loadingState = false;
@@ -3071,6 +3164,7 @@
     }
     refreshState(!!force);
     pollLogs(!!force);
+    refreshTraffic(!!force);
   }
 
   document.addEventListener("visibilitychange", function () {

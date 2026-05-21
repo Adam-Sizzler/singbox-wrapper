@@ -22,7 +22,10 @@ var (
 	procSetCtrlHandler    = kernel32DLL.NewProc("SetConsoleCtrlHandler")
 )
 
-const uiConfigActionTimeout = 5 * time.Second
+const (
+	uiConfigActionTimeout = 5 * time.Second
+	singBoxCheckTimeout   = 12 * time.Second
+)
 
 func (a *App) isProcessRunning() bool {
 	a.procMu.Lock()
@@ -91,18 +94,29 @@ func (a *App) checkConfigAction() error {
 			return err
 		}
 
+		resolvedVersion, err := resolveVersion(active.Version)
+		if err != nil {
+			return fmt.Errorf("не удалось определить версию sing-box: %w", err)
+		}
+		if err := a.ensureSingBox(resolvedVersion); err != nil {
+			return err
+		}
+
 		if strings.TrimSpace(resolvedConfigURL) == "" {
 			if err := a.ensureLocalRuntimeConfig(runtimeCfgPath); err != nil {
 				return err
 			}
-			a.log("Проверка конфигурации OK: локальный %s валиден (профиль: %s)", runtimeCfgFile, profileName)
+			if err := validateRuntimeConfigWithSingBox(a.singBoxPath, runtimeCfgPath, singBoxCheckTimeout); err != nil {
+				return err
+			}
+			a.log("Проверка конфигурации OK: локальный %s валиден для sing-box (профиль: %s)", runtimeCfgFile, profileName)
 			return nil
 		}
 
-		if err := validateRemoteRuntimeConfigWithOptions(resolvedConfigURL, uiConfigActionTimeout, cfg.AllowInsecure); err != nil {
+		if err := validateRemoteRuntimeConfigWithSingBox(resolvedConfigURL, uiConfigActionTimeout, cfg.AllowInsecure, a.singBoxPath, singBoxCheckTimeout); err != nil {
 			return err
 		}
-		a.log("Проверка конфигурации OK: URL доступен и JSON валиден (профиль: %s)", profileName)
+		a.log("Проверка конфигурации OK: URL доступен и конфиг валиден для sing-box (профиль: %s)", profileName)
 		return nil
 	})
 }
@@ -214,6 +228,8 @@ func (a *App) startPipeline() error {
 
 	controllerAddr := ""
 	controllerSecret := ""
+	runCfgPath := runtimeCfgPath
+	runCfgTmpPath := ""
 	if clashSupported {
 		controllerAddr, err = allocateLocalControllerAddr()
 		if err != nil {
@@ -223,23 +239,21 @@ func (a *App) startPipeline() error {
 		if err != nil {
 			return fmt.Errorf("не удалось создать секрет clash api: %w", err)
 		}
-		if err := a.ensureRuntimeConfigHasClashAPI(runtimeCfgPath, controllerAddr, controllerSecret); err != nil {
+		runCfgPath, runCfgTmpPath, err = a.runtimeConfigWithClashAPI(runtimeCfgPath, controllerAddr, controllerSecret)
+		if err != nil {
 			return fmt.Errorf("не удалось включить clash api в %s: %w", runtimeCfgFile, err)
 		}
 	} else {
-		if err := a.stripRuntimeConfigClashAPI(runtimeCfgPath); err != nil {
-			return fmt.Errorf("не удалось отключить clash api в %s: %w", runtimeCfgFile, err)
-		}
 		a.log("WARN: установленный sing-box не поддерживает with_clash_api, live-переключение selector отключено")
 	}
 
 	a.stopProcess()
 	if clashSupported {
-		a.setClashSession(controllerAddr, controllerSecret, runtimeCfgPath)
+		a.setClashSession(controllerAddr, controllerSecret, runCfgPath, runCfgTmpPath)
 	} else {
 		a.resetClashSession()
 	}
-	if err := a.startProcess(runtimeCfgPath); err != nil {
+	if err := a.startProcess(runCfgPath); err != nil {
 		a.resetClashSession()
 		return err
 	}
@@ -256,6 +270,45 @@ func (a *App) ensureLocalRuntimeConfig(runtimeCfgPath string) error {
 	a.runtimeCfgMu.Lock()
 	defer a.runtimeCfgMu.Unlock()
 	return ensureLocalRuntimeConfig(runtimeCfgPath)
+}
+
+func (a *App) runtimeConfigWithClashAPI(runtimeCfgPath, controller, secret string) (runCfgPath string, tmpPath string, err error) {
+	a.runtimeCfgMu.Lock()
+	defer a.runtimeCfgMu.Unlock()
+
+	content, err := os.ReadFile(runtimeCfgPath)
+	if err != nil {
+		return "", "", err
+	}
+
+	tmpFile, err := os.CreateTemp(a.workDir, filepath.Base(runtimeCfgPath)+".run-*.json")
+	if err != nil {
+		return "", "", err
+	}
+	tmpPath = tmpFile.Name()
+	if _, err := tmpFile.Write(content); err != nil {
+		tmpFile.Close()
+		removeRuntimeTempFile(tmpPath)
+		return "", "", err
+	}
+	if err := tmpFile.Close(); err != nil {
+		removeRuntimeTempFile(tmpPath)
+		return "", "", err
+	}
+
+	if err := ensureRuntimeConfigHasClashAPI(tmpPath, controller, secret); err != nil {
+		removeRuntimeTempFile(tmpPath)
+		return "", "", err
+	}
+	return tmpPath, tmpPath, nil
+}
+
+func removeRuntimeTempFile(path string) {
+	path = strings.TrimSpace(path)
+	if path == "" {
+		return
+	}
+	_ = os.Remove(path)
 }
 
 func (a *App) refreshRuntimeConfigFromURL(url, runtimeCfgPath string) (bool, error) {

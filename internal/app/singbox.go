@@ -192,6 +192,15 @@ func validateRemoteRuntimeConfigWithOptions(url string, timeout time.Duration, a
 	return validateRuntimeConfigFile(tmpPath)
 }
 
+func validateRemoteRuntimeConfigWithSingBox(url string, timeout time.Duration, allowInsecure bool, singboxPath string, checkTimeout time.Duration) error {
+	tmpPath := filepath.Join(os.TempDir(), fmt.Sprintf("singbox-wrapper-config-check-%d.json", time.Now().UnixNano()))
+	if err := downloadFileWithOptions(url, tmpPath, subscriptionRequestHeaders(), timeout, allowInsecure); err != nil {
+		return fmt.Errorf("не удалось скачать runtime-конфиг: %w", err)
+	}
+	defer os.Remove(tmpPath)
+	return validateRuntimeConfigWithSingBox(singboxPath, tmpPath, checkTimeout)
+}
+
 func subscriptionRequestHeaders() map[string]string {
 	metadata := appDeviceMetadata()
 	return map[string]string{
@@ -218,6 +227,24 @@ func validateRuntimeConfigFile(path string) error {
 		return errors.New("конфиг не является валидным JSON")
 	}
 	return nil
+}
+
+func validateRuntimeConfigWithSingBox(singboxPath, configPath string, timeout time.Duration) error {
+	if err := validateRuntimeConfigFile(configPath); err != nil {
+		return err
+	}
+	if timeout <= 0 {
+		timeout = 10 * time.Second
+	}
+	output, err := commandWithTimeout(singboxPath, timeout, "check", "-c", configPath)
+	if err == nil {
+		return nil
+	}
+	text := strings.TrimSpace(string(output))
+	if text == "" {
+		return fmt.Errorf("sing-box check завершился с ошибкой: %w", err)
+	}
+	return fmt.Errorf("sing-box check завершился с ошибкой: %w: %s", err, text)
 }
 
 func downloadFile(url, target string, headers map[string]string) error {

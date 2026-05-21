@@ -65,6 +65,7 @@ type App struct {
 	clashController   string
 	clashSecret       string
 	clashRuntimeCfg   string
+	clashRuntimeTmp   string
 
 	selectorCacheProfile   string
 	selectorCacheLive      bool

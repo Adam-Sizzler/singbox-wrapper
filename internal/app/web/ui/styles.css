@@ -796,17 +796,6 @@ button.control:disabled {
   gap: var(--ui-space-2-5);
 }
 
-.selector-toolbar {
-  display: flex;
-  justify-content: flex-end;
-  align-items: center;
-  min-height: calc(34 * var(--ui-px));
-}
-
-.selector-toolbar:empty {
-  display: none;
-}
-
 .selector-groups {
   display: flex;
   flex-direction: column;
@@ -893,7 +882,6 @@ body.theme-light .selector-group-header {
   gap: var(--ui-space-1);
 }
 
-.selector-global-ping-btn,
 .selector-group-ping,
 .selector-group-toggle {
   width: calc(34 * var(--ui-px));
@@ -912,20 +900,17 @@ body.theme-light .selector-group-header {
   cursor: pointer;
 }
 
-.selector-global-ping-btn:hover,
 .selector-group-ping:hover,
 .selector-group-toggle:hover {
   background: rgba(255, 255, 255, 0.065) !important;
   color: var(--ui-text) !important;
 }
 
-body.theme-light .selector-global-ping-btn:hover,
 body.theme-light .selector-group-ping:hover,
 body.theme-light .selector-group-toggle:hover {
   background: rgba(30, 34, 44, 0.08) !important;
 }
 
-.selector-global-ping-btn.loading,
 .selector-group-ping.loading {
   cursor: wait;
 }
@@ -960,6 +945,7 @@ body.theme-light .selector-group-toggle:hover {
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: var(--ui-space-2);
   padding: var(--ui-space-3);
+  align-items: center;
 }
 
 .selector-options-grid[hidden] {
@@ -969,19 +955,22 @@ body.theme-light .selector-group-toggle:hover {
 .selector-option-card {
   width: 100%;
   min-width: 0;
-  height: calc(54 * var(--ui-px));
-  min-height: calc(54 * var(--ui-px));
-  display: grid;
+  height: var(--ui-control-height);
+  min-height: var(--ui-control-height);
+  display: grid !important;
   grid-template-columns: minmax(0, 1fr) auto;
+  justify-content: stretch;
+  justify-items: stretch;
   align-items: center;
   gap: var(--ui-space-1-5);
-  padding: 0 var(--ui-space-2-5) !important;
-  border-radius: calc(11 * var(--ui-px)) !important;
+  padding: 0 var(--ui-space-3) !important;
+  border-radius: var(--ui-radius-md) !important;
   background: var(--ui-selector-option-bg) !important;
   color: var(--ui-text) !important;
-  line-height: 1.15;
+  line-height: var(--ui-control-height);
+  text-align: left;
   cursor: pointer;
-  border: calc(2 * var(--ui-px)) solid transparent !important;
+  border: none !important;
 }
 
 body.theme-light .selector-option-card {
@@ -1016,7 +1005,6 @@ body.theme-light .selector-option-card.active {
 
 .selector-option-card.disabled,
 .selector-option-card:disabled,
-.selector-global-ping-btn:disabled,
 .selector-group-ping:disabled,
 .selector-group-toggle:disabled {
   opacity: 0.62;
@@ -1024,34 +1012,38 @@ body.theme-light .selector-option-card.active {
 }
 
 .selector-option-name {
+  justify-self: start;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   text-align: left;
   font-size: var(--ui-font-md);
-  font-weight: 800;
+  font-weight: 400;
   letter-spacing: -0.02em;
+  color: inherit;
 }
 
 .selector-option-delay {
+  justify-self: end;
   flex: 0 0 auto;
   max-width: calc(62 * var(--ui-px));
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  color: var(--ui-muted);
+  color: inherit;
   font-size: var(--ui-font-xs);
-  font-weight: 900;
+  font-weight: 400;
   text-align: right;
+  opacity: 0.82;
 }
 
 .selector-option-delay.measured {
-  color: rgba(210, 218, 255, 0.96);
+  color: inherit;
 }
 
 body.theme-light .selector-option-delay.measured {
-  color: rgba(66, 82, 140, 0.95);
+  color: inherit;
 }
 
 .selector-option-delay.error {
@@ -1747,72 +1739,6 @@ body.theme-light #releaseMenuToggle:active {
   align-items: flex-start;
 }
 
-#selectorBlock > .field-label {
-  align-self: flex-start;
-}
-
-.selector-options-grid {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  align-items: center;
-}
-
-button.selector-option-card {
-  display: grid !important;
-  grid-template-columns: minmax(0, 1fr) auto;
-  justify-content: stretch;
-  justify-items: stretch;
-  align-items: center;
-  width: 100%;
-  height: var(--ui-control-height);
-  min-height: var(--ui-control-height);
-  padding: 0 var(--ui-space-3) !important;
-  border-radius: var(--ui-radius-md) !important;
-  border: none !important;
-  background: var(--ui-selector-option-bg) !important;
-  color: var(--ui-text) !important;
-  line-height: var(--ui-control-height);
-  text-align: left;
-}
-
-button.selector-option-card:hover {
-  background: var(--ui-selector-option-hover) !important;
-  color: var(--ui-accent-text) !important;
-}
-
-button.selector-option-card:active {
-  background: var(--ui-selector-option-active) !important;
-  color: var(--ui-accent-text) !important;
-}
-
-button.selector-option-card.active {
-  background: var(--ui-selector-option-selected) !important;
-  color: var(--ui-accent-text) !important;
-}
-
-button.selector-option-card.active:hover {
-  background: var(--ui-selector-option-hover) !important;
-  color: var(--ui-accent-text) !important;
-}
-
-button.selector-option-card.active:active {
-  background: var(--ui-selector-option-active) !important;
-  color: var(--ui-accent-text) !important;
-}
-
-button.control.selector-option-card:hover,
-button.control.selector-option-card:active,
-button.control.selector-option-card.active,
-button.control.selector-option-card.active:hover,
-button.control.selector-option-card.active:active,
-body.theme-light button.control.selector-option-card:hover,
-body.theme-light button.control.selector-option-card:active,
-body.theme-light button.control.selector-option-card.active,
-body.theme-light button.control.selector-option-card.active:hover,
-body.theme-light button.control.selector-option-card.active:active {
-  background: var(--ui-selector-option-selected) !important;
-  color: var(--ui-accent-text) !important;
-}
-
 .selector-group-card.urltest button.selector-option-card {
   cursor: default;
 }
@@ -1831,26 +1757,6 @@ body.theme-light .selector-group-card.urltest button.control.selector-option-car
 body.theme-light .selector-group-card.urltest button.control.selector-option-card.active:active {
   background: var(--ui-selector-option-selected) !important;
   color: var(--ui-accent-text) !important;
-}
-
-button.selector-option-card .selector-option-name {
-  justify-self: start;
-  text-align: left;
-  font-weight: 400;
-  color: inherit;
-}
-
-button.selector-option-card .selector-option-delay {
-  justify-self: end;
-  text-align: right;
-  font-weight: 400;
-  color: inherit;
-  opacity: 0.82;
-}
-
-button.selector-option-card .selector-option-delay.measured,
-body.theme-light button.selector-option-card .selector-option-delay.measured {
-  color: inherit;
 }
 
 .selector-group-toggle {

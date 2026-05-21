@@ -23,16 +23,18 @@ import (
 )
 
 const (
-	selectorCacheTTL            = 2 * time.Second
-	clashAPIRequestTimeout      = 2200 * time.Millisecond
-	clashAPIDelayRequestTimeout = 6500 * time.Millisecond
-	clashApplyRetryInterval     = 350 * time.Millisecond
-	clashApplyRetryMaxTries     = 8
+	selectorCacheTTL              = 2 * time.Second
+	clashAPIRequestTimeout        = 2200 * time.Millisecond
+	clashAPITrafficRequestTimeout = 900 * time.Millisecond
+	clashAPIDelayRequestTimeout   = 6500 * time.Millisecond
+	clashApplyRetryInterval       = 350 * time.Millisecond
+	clashApplyRetryMaxTries       = 8
 )
 
 var (
-	clashAPIHTTPClient      = &http.Client{Timeout: clashAPIRequestTimeout}
-	clashAPIDelayHTTPClient = &http.Client{Timeout: clashAPIDelayRequestTimeout}
+	clashAPIHTTPClient        = &http.Client{Timeout: clashAPIRequestTimeout}
+	clashAPITrafficHTTPClient = &http.Client{Timeout: clashAPITrafficRequestTimeout}
+	clashAPIDelayHTTPClient   = &http.Client{Timeout: clashAPIDelayRequestTimeout}
 )
 
 type SelectorOptionDelayState struct {
@@ -431,24 +433,32 @@ func (a *App) clashSessionSnapshot() (controller, secret, runtimeCfgPath string)
 	return a.clashController, a.clashSecret, a.clashRuntimeCfg
 }
 
-func (a *App) setClashSession(controller, secret, runtimeCfgPath string) {
+func (a *App) setClashSession(controller, secret, runtimeCfgPath, runtimeTmpPath string) {
 	a.clashMu.Lock()
-	defer a.clashMu.Unlock()
+	oldTmpPath := a.clashRuntimeTmp
 	a.clashController = strings.TrimSpace(controller)
 	a.clashSecret = strings.TrimSpace(secret)
 	a.clashRuntimeCfg = strings.TrimSpace(runtimeCfgPath)
+	a.clashRuntimeTmp = strings.TrimSpace(runtimeTmpPath)
 	a.clearSelectorCacheLocked()
+	a.clashMu.Unlock()
+
 	a.resetTrafficSnapshot()
+	removeRuntimeTempFile(oldTmpPath)
 }
 
 func (a *App) resetClashSession() {
 	a.clashMu.Lock()
-	defer a.clashMu.Unlock()
+	tmpPath := a.clashRuntimeTmp
 	a.clashController = ""
 	a.clashSecret = ""
 	a.clashRuntimeCfg = ""
+	a.clashRuntimeTmp = ""
 	a.clearSelectorCacheLocked()
+	a.clashMu.Unlock()
+
 	a.resetTrafficSnapshot()
+	removeRuntimeTempFile(tmpPath)
 }
 
 func (a *App) invalidateSelectorCache() {
@@ -914,8 +924,13 @@ func (a *App) clashAPIRequest(method, route string, payload any, out any) error 
 	}
 
 	client := clashAPIHTTPClient
-	if method == http.MethodGet && strings.Contains(strings.ToLower(route), "/delay") {
-		client = clashAPIDelayHTTPClient
+	if method == http.MethodGet {
+		lowerRoute := strings.ToLower(route)
+		if strings.Contains(lowerRoute, "/delay") {
+			client = clashAPIDelayHTTPClient
+		} else if lowerRoute == "/connections" {
+			client = clashAPITrafficHTTPClient
+		}
 	}
 
 	resp, err := client.Do(req)

@@ -31,6 +31,9 @@ func (a *App) trafficSnapshot() TrafficState {
 
 	var payload clashConnectionsResponse
 	if err := a.clashAPIRequest(http.MethodGet, "/connections", nil, &payload); err != nil {
+		if state, ok := a.cachedTrafficSnapshot(err); ok {
+			return state
+		}
 		return TrafficState{
 			Available: false,
 			UpdatedAt: time.Now().UnixMilli(),
@@ -64,6 +67,26 @@ func (a *App) trafficSnapshot() TrafficState {
 	a.trafficSampleAt = now
 	a.trafficSampleValid = true
 	return state
+}
+
+func (a *App) cachedTrafficSnapshot(sourceErr error) (TrafficState, bool) {
+	now := time.Now()
+	a.trafficMu.Lock()
+	defer a.trafficMu.Unlock()
+	if !a.trafficSampleValid || a.trafficSampleAt.IsZero() || now.Sub(a.trafficSampleAt) > 5*time.Second {
+		return TrafficState{}, false
+	}
+	message := ""
+	if sourceErr != nil {
+		message = sourceErr.Error()
+	}
+	return TrafficState{
+		Available:     true,
+		UploadTotal:   a.trafficUploadTotal,
+		DownloadTotal: a.trafficDownloadTotal,
+		UpdatedAt:     now.UnixMilli(),
+		Error:         message,
+	}, true
 }
 
 func (a *App) resetTrafficSnapshot() {

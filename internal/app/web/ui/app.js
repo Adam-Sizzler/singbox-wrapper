@@ -17,20 +17,14 @@
   var deleteProfileBtn = document.getElementById("deleteProfile");
   var selectorBlockNode = document.getElementById("selectorBlock");
   var selectorGroupsNode = document.getElementById("selectorGroups");
-  var selectorPingAllBtn = document.getElementById("selectorPingAll");
   var checkConfigBtn = document.getElementById("checkConfig");
   var refreshConfigBtn = document.getElementById("refreshConfig");
   var startStopBtn = document.getElementById("startStop");
   var clearLogsBtn = document.getElementById("clearLogs");
   var copyLogsBtn = document.getElementById("copyLogs");
-  var mobileActionsWrap = document.getElementById("mobileActionsWrap");
-  var mobileActionsToggleBtn = document.getElementById("mobileActionsToggle");
-  var mobileActionsMenu = document.getElementById("mobileActionsMenu");
-  var mobileActionCheckConfigBtn = document.getElementById("mobileActionCheckConfig");
-  var mobileActionRefreshConfigBtn = document.getElementById("mobileActionRefreshConfig");
-  var mobileActionCopyLogsBtn = document.getElementById("mobileActionCopyLogs");
   var toastStack = document.getElementById("toastStack");
   var statusNode = document.getElementById("status");
+  var trafficStatsNode = document.getElementById("trafficStats");
   var logsNode = document.getElementById("logs");
   var logsFilterInput = document.getElementById("logsFilter");
   var settingsTitleNode = document.getElementById("settingsTitle");
@@ -54,7 +48,6 @@
   var labelStartMinimizedTrayNode = document.getElementById("labelStartMinimizedTray");
   var labelInsecureToggleNode = document.getElementById("labelInsecureToggle");
   var labelAccentColorNode = document.getElementById("labelAccentColor");
-  var labelCheckConfigNode = document.getElementById("labelCheckConfig");
   var langRuBtn = document.getElementById("langRu");
   var langEnBtn = document.getElementById("langEn");
   var confirmModal = document.getElementById("confirmModal");
@@ -73,10 +66,8 @@
   var navSettingsText = document.getElementById("navSettingsText");
   var homeTitleNode = document.getElementById("homeTitle");
   var profilesTitleNode = document.getElementById("profilesTitle");
-  var homeActionsTitleNode = document.getElementById("homeActionsTitle");
   var homeProfileRowNode = document.getElementById("homeProfileRow");
   var homeProfileLabelNode = document.getElementById("homeProfileLabel");
-  var homeSelectorLabelNode = document.getElementById("homeSelectorLabel");
   var profilesActionsTitleNode = document.getElementById("profilesActionsTitle");
   var labelProfileActionsNode = document.getElementById("labelProfileActions");
   var labelProfileListNode = document.getElementById("labelProfileList");
@@ -103,11 +94,14 @@
   var lastLogId = 0;
   var stateTimer = null;
   var logsTimer = null;
+  var trafficTimer = null;
   var uptimeTimer = null;
   var saveTimer = null;
   var stateReqInFlight = false;
   var stateReqQueued = false;
   var logsReqInFlight = false;
+  var trafficReqInFlight = false;
+  var trafficReqQueued = false;
   var copyLogsInFlight = false;
   var startupPatchInFlight = false;
   var startupPatchQueued = false;
@@ -127,11 +121,11 @@
   var profileMenuOpened = false;
   var openedProfileMenuKind = "";
   var releaseMenuOpened = false;
-  var mobileActionsOpened = false;
   var activeScreen = "home";
   var currentLanguage = "ru";
   var lastRunning = false;
   var lastBusy = false;
+  var lastTrafficData = null;
   var appUpdateInFlight = false;
   var lastProtoWarn = "";
   var lastAutoUpdateHours = 12;
@@ -166,13 +160,14 @@
   var LOGS_POLL_MAX_MS = 3200;
   var LOGS_POLL_EMPTY_STEP_MS = 300;
   var LOGS_POLL_ERROR_MS = 4200;
+  var TRAFFIC_POLL_MS = 1000;
   var MAX_RENDERED_LOG_LINES = 2000;
   var MAX_FILTER_PATTERN_LEN = 256;
   var ANSI_ESC_RAW_MARKER = "\x1b[";
   var ANSI_ESC_FALLBACK_MARKER = "\u2190[";
   var HIRES_UI_WIDTH_THRESHOLD = 3200;
   var HIRES_UI_HEIGHT_THRESHOLD = 1800;
-  var HIRES_UI_SCALE = 0.8;
+  var HIRES_UI_SCALE = 0.85;
   var lastDisplayScale = null;
   var lastAccentColor = DEFAULT_ACCENT_COLOR;
   var accentColorTimer = null;
@@ -185,7 +180,6 @@
       profiles: "Профили",
       settings: "Настройки",
       logs: "Логи",
-      homeActions: "Основные действия",
       profileActions: "Действия профиля",
       profileActionsLabel: "Управление:",
       profileListLabel: "Профиль:",
@@ -208,7 +202,6 @@
       accentColorChoose: "Выбрать",
       accentColorReset: "Сброс",
       homeProfileLabel: "Профиль",
-      homeSelectorLabel: "Селектор",
       selectorEmpty: "Нет доступных селекторов",
       selectorPing: "Пинг",
       selectorPingTitle: "Проверить задержку",
@@ -217,7 +210,6 @@
       selectorDelayError: "ERR",
       selectorDelayNeedRun: "Запустите ядро для проверки задержки",
       runCheck: "Запуск:",
-      checkConfigLabel: "Проверка:",
       checkConfig: "Проверить",
       refreshConfig: "Обновить",
       newProfile: "Новый",
@@ -229,7 +221,6 @@
       logsFilterPlaceholder: "Фильтр RegExp",
       logsFilterInvalid: "Некорректный RegExp",
       logsFilterTooLong: "Слишком длинный RegExp",
-      actionsMenu: "Действия",
       statusBusy: "Выполняется операция...",
       statusConfigOk: "Конфигурация валидна",
       statusConfigUpdated: "Обновление конфигурации завершено",
@@ -237,6 +228,8 @@
       statusRunning: "Ядро запущено",
       statusStopped: "Ядро остановлено",
       uptime: "Время работы",
+      upload: "Upload",
+      download: "Download",
       statusLogsCleared: "Логи очищены",
       statusLogsCopied: "Логи скопированы в буфер обмена",
       profilesEmpty: "Профили отсутствуют",
@@ -258,7 +251,6 @@
       profiles: "Profiles",
       settings: "Settings",
       logs: "Logs",
-      homeActions: "Primary actions",
       profileActions: "Profile actions",
       profileActionsLabel: "Manage:",
       profileListLabel: "Profile:",
@@ -281,7 +273,6 @@
       accentColorChoose: "Choose",
       accentColorReset: "Reset",
       homeProfileLabel: "Profile",
-      homeSelectorLabel: "Selector",
       selectorEmpty: "No selectors available",
       selectorPing: "Ping",
       selectorPingTitle: "Check delay",
@@ -290,7 +281,6 @@
       selectorDelayError: "ERR",
       selectorDelayNeedRun: "Start the core to check delay",
       runCheck: "Run:",
-      checkConfigLabel: "Check:",
       checkConfig: "Check",
       refreshConfig: "Refresh",
       newProfile: "New",
@@ -302,7 +292,6 @@
       logsFilterPlaceholder: "RegExp filter",
       logsFilterInvalid: "Invalid RegExp",
       logsFilterTooLong: "RegExp is too long",
-      actionsMenu: "Actions",
       statusBusy: "Operation in progress...",
       statusConfigOk: "Configuration is valid",
       statusConfigUpdated: "Configuration refresh completed",
@@ -310,6 +299,8 @@
       statusRunning: "Core is running",
       statusStopped: "Core is stopped",
       uptime: "Uptime",
+      upload: "Upload",
+      download: "Download",
       statusLogsCleared: "Logs cleared",
       statusLogsCopied: "Logs copied to clipboard",
       profilesEmpty: "No profiles",
@@ -511,7 +502,7 @@
       accentColorInput.value = accent;
     }
     if (accentColorSwatchNode) {
-      accentColorSwatchNode.style.background = accent;
+      accentColorSwatchNode.style.background = "";
     }
     return accent;
   }
@@ -811,9 +802,7 @@
     if (profilesTitleNode) profilesTitleNode.textContent = tr("profiles");
     if (settingsTitleNode) settingsTitleNode.textContent = tr("settings");
     if (logsTitleNode) logsTitleNode.textContent = tr("logs");
-    if (homeActionsTitleNode) homeActionsTitleNode.textContent = tr("homeActions");
     if (homeProfileLabelNode) homeProfileLabelNode.textContent = tr("homeProfileLabel");
-    if (homeSelectorLabelNode) homeSelectorLabelNode.textContent = tr("homeSelectorLabel");
     if (profilesActionsTitleNode) profilesActionsTitleNode.textContent = tr("profileActions");
     if (labelProfileActionsNode) labelProfileActionsNode.textContent = tr("profileActionsLabel");
     if (labelProfileListNode) labelProfileListNode.textContent = tr("profileListLabel");
@@ -832,7 +821,6 @@
     if (labelAccentColorNode) labelAccentColorNode.textContent = tr("accentColor");
     if (accentColorTextNode) accentColorTextNode.textContent = tr("accentColorChoose");
     if (accentColorResetBtn) accentColorResetBtn.textContent = tr("accentColorReset");
-    if (labelCheckConfigNode) labelCheckConfigNode.textContent = tr("checkConfigLabel");
     if (checkConfigBtn) checkConfigBtn.textContent = tr("checkConfig");
     if (refreshConfigBtn) refreshConfigBtn.textContent = tr("refreshConfig");
     if (newProfileBtn) newProfileBtn.textContent = tr("newProfile");
@@ -844,10 +832,6 @@
       logsFilterInput.placeholder = filterHint;
       logsFilterInput.setAttribute("aria-label", filterHint);
     }
-    if (mobileActionsToggleBtn) mobileActionsToggleBtn.textContent = tr("actionsMenu");
-    if (mobileActionCheckConfigBtn) mobileActionCheckConfigBtn.textContent = tr("checkConfig");
-    if (mobileActionRefreshConfigBtn) mobileActionRefreshConfigBtn.textContent = tr("refreshConfig");
-    if (mobileActionCopyLogsBtn) mobileActionCopyLogsBtn.textContent = tr("copyLogs");
     renderStartStopText();
     renderStartStopIndicator();
     if (releaseCurrentCaptionNode) releaseCurrentCaptionNode.textContent = tr("releaseCurrent");
@@ -863,6 +847,7 @@
     renderUptime(lastUptimeSeconds, lastRunning);
     renderAppVersion(lastAppReleaseTag);
     renderSidebarStatus();
+    renderTrafficStats(null);
     renderAppReleaseMenu(lastAppReleaseTag, lastAppReleaseURL, lastAppUpdateAvailable, lastAppLatestReleaseTag, lastAppLatestReleaseURL);
     renderProfileMenu();
 
@@ -873,9 +858,6 @@
       langEnBtn.className = currentLanguage === "en" ? "control lang-btn active" : "control lang-btn";
     }
 
-    if (mobileActionsToggleBtn) {
-      mobileActionsToggleBtn.setAttribute("aria-label", tr("actionsMenu"));
-    }
     applyThemeModeControls();
     renderSelectorGroups(selectorGroups);
     setLogsFilterValidation(logsFilterError);
@@ -1237,44 +1219,11 @@
     var next = !!disabled;
     if (checkConfigBtn) checkConfigBtn.disabled = next;
     if (refreshConfigBtn) refreshConfigBtn.disabled = next;
-    if (mobileActionCheckConfigBtn) mobileActionCheckConfigBtn.disabled = next;
-    if (mobileActionRefreshConfigBtn) mobileActionRefreshConfigBtn.disabled = next;
   }
 
   function setCopyButtonsDisabled(disabled) {
     var next = !!disabled;
     if (copyLogsBtn) copyLogsBtn.disabled = next;
-    if (mobileActionCopyLogsBtn) mobileActionCopyLogsBtn.disabled = next;
-  }
-
-  function isMobileActionsMenuOpen() {
-    return !!mobileActionsMenu && !mobileActionsMenu.hidden;
-  }
-
-  function closeMobileActionsMenu() {
-    if (!mobileActionsMenu || mobileActionsMenu.hidden) return;
-    mobileActionsMenu.hidden = true;
-    mobileActionsOpened = false;
-    if (mobileActionsToggleBtn) {
-      mobileActionsToggleBtn.setAttribute("aria-expanded", "false");
-    }
-  }
-
-  function openMobileActionsMenu() {
-    if (!mobileActionsMenu) return;
-    mobileActionsMenu.hidden = false;
-    mobileActionsOpened = true;
-    if (mobileActionsToggleBtn) {
-      mobileActionsToggleBtn.setAttribute("aria-expanded", "true");
-    }
-  }
-
-  function toggleMobileActionsMenu() {
-    if (isMobileActionsMenuOpen()) {
-      closeMobileActionsMenu();
-      return;
-    }
-    openMobileActionsMenu();
   }
 
   function normalizeSelectorGroups(rawGroups) {
@@ -1563,15 +1512,6 @@
   function updateSelectorPingAllButton() {
     var isPinging = !!selectorPingInFlightKey;
     var title = lastRunning ? tr("selectorPingTitle") : tr("selectorDelayNeedRun");
-    var disabled = selectorSwitchInFlight || isPinging || lastBusy || !lastRunning || !selectorGroups.length;
-
-    if (selectorPingAllBtn) {
-      selectorPingAllBtn.disabled = !!disabled;
-      selectorPingAllBtn.className = "control selector-global-ping-btn" + (isPinging ? " loading" : "");
-      selectorPingAllBtn.title = title;
-      selectorPingAllBtn.setAttribute("aria-label", title || tr("selectorPingTitle"));
-      selectorPingAllBtn.innerHTML = isPinging ? '<span class="selector-ping-busy">' + tr("selectorPingBusy") + '</span>' : selectorSpeedIconHTML();
-    }
 
     if (!selectorGroupsNode) return;
     var groupButtons = selectorGroupsNode.getElementsByClassName("selector-group-ping");
@@ -1860,6 +1800,76 @@
     }, logsPollDelay);
   }
 
+  function trafficLabels() {
+    return {
+      upload: tr("upload"),
+      download: tr("download")
+    };
+  }
+
+  function renderTrafficStats(data) {
+    if (data) {
+      lastTrafficData = data;
+    }
+    var renderer = window.SBTrafficUI;
+    if (renderer && typeof renderer.render === "function") {
+      renderer.render(trafficStatsNode, lastTrafficData || {}, lastRunning, trafficLabels());
+      return;
+    }
+    if (trafficStatsNode) {
+      trafficStatsNode.hidden = true;
+    }
+  }
+
+  function scheduleNextTrafficPoll(delayMs) {
+    if (!pollingActive || !lastRunning) return;
+    if (trafficTimer) {
+      clearTimeout(trafficTimer);
+      trafficTimer = null;
+    }
+    var delay = typeof delayMs === "number" ? delayMs : TRAFFIC_POLL_MS;
+    if (delay < 0) delay = 0;
+    trafficTimer = setTimeout(function () {
+      trafficTimer = null;
+      refreshTraffic(false);
+    }, delay);
+  }
+
+  function refreshTraffic(force) {
+    if (!lastRunning) {
+      renderTrafficStats({ available: false });
+      return;
+    }
+    if (document.hidden && !force) {
+      scheduleNextTrafficPoll(TRAFFIC_POLL_MS);
+      return;
+    }
+    if (trafficReqInFlight) {
+      if (force) {
+        trafficReqQueued = true;
+      }
+      return;
+    }
+
+    trafficReqInFlight = true;
+    api("GET", "/api/traffic", null, function (err, data) {
+      trafficReqInFlight = false;
+      if (err) {
+        renderTrafficStats({ available: false });
+      } else {
+        renderTrafficStats(data || {});
+      }
+
+      if (trafficReqQueued) {
+        trafficReqQueued = false;
+        refreshTraffic(true);
+        return;
+      }
+
+      scheduleNextTrafficPoll(TRAFFIC_POLL_MS);
+    });
+  }
+
   function startUptimeTicker() {
     if (uptimeTimer) return;
     uptimeTimer = setInterval(function () {
@@ -1883,6 +1893,7 @@
     }
     scheduleNextStatePoll(computeStatePollDelay());
     scheduleNextLogsPoll(logsPollDelay);
+    scheduleNextTrafficPoll(0);
     startUptimeTicker();
   }
 
@@ -1895,6 +1906,10 @@
     if (logsTimer) {
       clearTimeout(logsTimer);
       logsTimer = null;
+    }
+    if (trafficTimer) {
+      clearTimeout(trafficTimer);
+      trafficTimer = null;
     }
     stopUptimeTicker();
   }
@@ -2113,6 +2128,13 @@
 
     lastProtoWarn = state.proto_reg_warn || "";
     renderDefaultStatus(lastProtoWarn);
+    if (!lastRunning) {
+      renderTrafficStats({ available: false });
+    } else if (!prevRunning || !trafficTimer) {
+      refreshTraffic(true);
+    } else {
+      renderTrafficStats(null);
+    }
 
     revealUIAfterInitialState();
     loadingState = false;
@@ -2803,9 +2825,6 @@
     if (releaseMenuOpened && releaseMenuWrap && releaseMenuWrap.contains && !releaseMenuWrap.contains(target)) {
       closeReleaseMenu();
     }
-    if (mobileActionsOpened && mobileActionsWrap && mobileActionsWrap.contains && !mobileActionsWrap.contains(target)) {
-      closeMobileActionsMenu();
-    }
     if (selectorMenuOpenName && selectorGroupsNode && selectorGroupsNode.contains && !selectorGroupsNode.contains(target)) {
       closeSelectorMenu();
     }
@@ -2819,9 +2838,6 @@
       }
       if (releaseMenuOpened) {
         closeReleaseMenu();
-      }
-      if (mobileActionsOpened) {
-        closeMobileActionsMenu();
       }
       if (selectorMenuOpenName) {
         closeSelectorMenu();
@@ -2868,33 +2884,6 @@
     };
   }
 
-  if (mobileActionsToggleBtn) {
-    mobileActionsToggleBtn.onclick = function () {
-      toggleMobileActionsMenu();
-    };
-  }
-
-  if (mobileActionCheckConfigBtn) {
-    mobileActionCheckConfigBtn.onclick = function () {
-      closeMobileActionsMenu();
-      runCheckConfigAction();
-    };
-  }
-
-  if (mobileActionRefreshConfigBtn) {
-    mobileActionRefreshConfigBtn.onclick = function () {
-      closeMobileActionsMenu();
-      runRefreshConfigAction();
-    };
-  }
-
-  if (mobileActionCopyLogsBtn) {
-    mobileActionCopyLogsBtn.onclick = function () {
-      closeMobileActionsMenu();
-      runCopyLogsAction();
-    };
-  }
-
   if (selectorGroupsNode && selectorGroupsNode.addEventListener) {
     selectorGroupsNode.addEventListener("click", function (e) {
       var event = e || window.event;
@@ -2932,12 +2921,6 @@
         return;
       }
     });
-  }
-
-  if (selectorPingAllBtn) {
-    selectorPingAllBtn.onclick = function () {
-      runSelectorPingAll("", selectorPingAllBtn);
-    };
   }
 
   langRuBtn.onclick = function () {
@@ -3071,13 +3054,13 @@
     }
     refreshState(!!force);
     pollLogs(!!force);
+    refreshTraffic(!!force);
   }
 
   document.addEventListener("visibilitychange", function () {
     if (document.hidden) {
       stopPolling();
       closeReleaseMenu();
-      closeMobileActionsMenu();
       return;
     }
     var now = Date.now();
@@ -3107,7 +3090,6 @@
     if (logsFilterTimer) clearTimeout(logsFilterTimer);
     if (profileRenameTimer) clearTimeout(profileRenameTimer);
     closeReleaseMenu();
-    closeMobileActionsMenu();
     closeSelectorMenu();
     closeConfirmModal();
   };

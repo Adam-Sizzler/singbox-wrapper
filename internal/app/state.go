@@ -65,12 +65,19 @@ type App struct {
 	clashController   string
 	clashSecret       string
 	clashRuntimeCfg   string
+	clashRuntimeTmp   string
 
 	selectorCacheProfile   string
 	selectorCacheLive      bool
 	selectorCacheExpiresAt time.Time
 	selectorCacheGroups    []SelectorGroupState
 	selectorDelayCache     map[string]SelectorOptionDelayState
+
+	trafficMu            sync.Mutex
+	trafficUploadTotal   int64
+	trafficDownloadTotal int64
+	trafficSampleAt      time.Time
+	trafficSampleValid   bool
 
 	runMu         sync.Mutex
 	runningAction bool

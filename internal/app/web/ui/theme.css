@@ -1,4 +1,6 @@
 :root {
+  --mantine-color-blue-4: #218bff;
+  --mantine-color-teal-4: #38d9a9;
   --mantine-scale: 1.25;
   --ui-responsive-scale: 1;
   --ui-display-scale: 1;

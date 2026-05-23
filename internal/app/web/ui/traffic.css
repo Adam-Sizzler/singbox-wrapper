@@ -39,6 +39,16 @@ body.theme-light .traffic-metric {
   grid-column: 1;
 }
 
+.traffic-upload .traffic-icon {
+  --ti-color: var(--mantine-color-blue-4);
+  color: var(--ti-color);
+}
+
+.traffic-download .traffic-icon {
+  --ti-color: var(--mantine-color-teal-4);
+  color: var(--ti-color);
+}
+
 .traffic-label {
   min-width: 0;
   color: var(--ui-muted);

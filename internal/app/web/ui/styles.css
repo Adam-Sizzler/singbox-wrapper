@@ -999,6 +999,25 @@ body.theme-light .selector-option-card.active {
   color: var(--ui-accent-text) !important;
 }
 
+/* Keep selector buttons accent-colored on hover in both themes.
+   The base button.control:hover rule is more specific than .selector-option-card:hover,
+   so dark theme used to fall back to the dark sidebar hover background. */
+button.control.selector-option-card:hover {
+  background: var(--ui-selector-option-hover) !important;
+  color: var(--ui-accent-text) !important;
+}
+
+button.control.selector-option-card:active {
+  background: var(--ui-selector-option-active) !important;
+  color: var(--ui-accent-text) !important;
+}
+
+button.control.selector-option-card.active:hover,
+button.control.selector-option-card.active:active {
+  background: var(--ui-selector-option-selected) !important;
+  color: var(--ui-accent-text) !important;
+}
+
 .selector-option-card.locked {
   cursor: default;
 }
@@ -2058,4 +2077,59 @@ body::-webkit-scrollbar-thumb:hover,
   .release-menu {
     width: min(calc(260 * var(--ui-px)), calc(100vw - calc(90 * var(--ui-px))));
   }
+}
+
+
+.selector-option-name {
+  display: inline-flex;
+  align-items: center;
+  min-width: 0;
+  gap: 0.42em;
+  font-family: var(--font-main, system-ui), "Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", sans-serif;
+}
+
+.selector-option-name .emoji-label-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.emoji-inline {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.2em;
+  height: 1.2em;
+  min-width: 1.2em;
+  flex: 0 0 auto;
+  line-height: 1;
+  vertical-align: -0.18em;
+  background: transparent !important;
+  border: 0 !important;
+  outline: 0 !important;
+  box-shadow: none !important;
+}
+
+img.emoji-inline,
+.emoji-inline img,
+.emoji-inline svg {
+  display: block;
+  width: 1.2em;
+  height: 1.2em;
+  background: transparent !important;
+  border: 0 !important;
+  outline: 0 !important;
+  box-shadow: none !important;
+}
+
+.emoji-flag {
+  object-fit: contain;
+  border-radius: 0 !important;
+  background-color: transparent !important;
+}
+
+.emoji-flag-native {
+  font-family: "Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", sans-serif;
+  font-size: 1em;
 }

@@ -69,11 +69,12 @@ func (a *App) runUI() error {
 		startMinimizedToTray,
 	)
 
-	uiHTML, err := loadEmbeddedUIHTML()
+	uiServer, err := startUIAssetServer(a.debugf)
 	if err != nil {
-		a.debugf("ui: loadEmbeddedUIHTML failed: %v", err)
+		a.debugf("ui: startUIAssetServer failed: %v", err)
 		return err
 	}
+	defer uiServer.stop()
 	defer a.shutdownUI()
 
 	if err := a.ensureTrayOwnerWindow(); err != nil {
@@ -163,12 +164,12 @@ func (a *App) runUI() error {
 	a.applyNativeDarkHints(startupThemeDark)
 	a.hideMainWindow()
 
-	a.debugf("ui: loading embedded HTML into webview")
-	if err := a.web.SetHTML(uiHTML); err != nil {
-		a.debugf("ui: SetHTML failed: %v", err)
+	a.debugf("ui: navigating to embedded UI assets at %s", uiServer.URL())
+	if err := a.web.Navigate(uiServer.URL()); err != nil {
+		a.debugf("ui: Navigate failed: %v", err)
 		return err
 	}
-	a.debugf("ui: SetHTML completed")
+	a.debugf("ui: Navigate completed")
 	a.syncEmbeddedWebViewWidgetBounds("after-sethtml")
 	a.scheduleEmbeddedWidgetSync("post-sethtml")
 

@@ -194,6 +194,15 @@ func (w *webViewHost) SetHTML(html string) error {
 	return nil
 }
 
+func (w *webViewHost) Navigate(targetURL string) error {
+	if w == nil || w.view == nil {
+		return errors.New("webview is not initialized")
+	}
+	w.debugf("webview: Navigate(%q)", targetURL)
+	w.view.Navigate(targetURL)
+	return nil
+}
+
 func (w *webViewHost) Eval(js string) error {
 	if w == nil || w.view == nil {
 		return errors.New("webview is not initialized")

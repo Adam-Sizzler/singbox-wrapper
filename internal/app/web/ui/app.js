@@ -1493,6 +1493,66 @@
     renderSelectorGroups(selectorGroups);
   }
 
+
+  // Emoji replacement is intentionally conservative:
+  // only a real Unicode flag prefix (regional-indicator pair) is replaced.
+  // Plain text like "auto", "seaeza" or "chinfomaniak" is never treated as emoji.
+  function regionalIndicatorCodePointToLetter(codePoint) {
+    if (codePoint < 0x1f1e6 || codePoint > 0x1f1ff) return "";
+    return String.fromCharCode(65 + codePoint - 0x1f1e6);
+  }
+
+  function regionalFlagPrefixInfo(value) {
+    var text = String(value || "");
+    if (text.length < 4) return null;
+
+    var first = text.codePointAt(0);
+    var firstLen = first > 0xffff ? 2 : 1;
+    var second = text.codePointAt(firstLen);
+    var secondLen = second > 0xffff ? 2 : 1;
+
+    var firstLetter = regionalIndicatorCodePointToLetter(first);
+    var secondLetter = regionalIndicatorCodePointToLetter(second);
+    if (!firstLetter || !secondLetter) return null;
+
+    var code = firstLetter + secondLetter;
+    return {
+      code: code,
+      emojiLength: firstLen + secondLen,
+      fileName: code.toLowerCase() + ".svg"
+    };
+  }
+
+  function appendSelectorLabel(parentNode, rawLabel) {
+    var textValue = String(rawLabel || "");
+    var info = regionalFlagPrefixInfo(textValue);
+
+    if (info) {
+      var flagText = textValue.slice(0, info.emojiLength);
+      var img = document.createElement("img");
+      img.className = "emoji-inline emoji-flag";
+      img.alt = flagText;
+      img.setAttribute("data-emoji-flag", info.code);
+      img.decoding = "async";
+      img.loading = "eager";
+      img.src = "/emoji/twemoji-flags/" + info.fileName;
+      img.onerror = function () {
+        var fallback = document.createElement("span");
+        fallback.className = "emoji-inline emoji-flag-native";
+        fallback.textContent = flagText;
+        if (img.parentNode) img.parentNode.replaceChild(fallback, img);
+      };
+      parentNode.appendChild(img);
+
+      textValue = textValue.slice(info.emojiLength).replace(/^[-_\s]+/, "");
+    }
+
+    var label = document.createElement("span");
+    label.className = "emoji-label-text";
+    label.textContent = textValue;
+    parentNode.appendChild(label);
+  }
+
   function selectorGroupTypeLabel(group) {
     var groupType = String(group && group.type || "").trim();
     if (groupType) return groupType;
@@ -1677,7 +1737,7 @@
 
         var optionNameNode = document.createElement("span");
         optionNameNode.className = "selector-option-name";
-        optionNameNode.textContent = optionValue;
+        appendSelectorLabel(optionNameNode, optionValue);
         optionNode.appendChild(optionNameNode);
 
         var delayBadge = document.createElement("span");

@@ -864,15 +864,56 @@ body.theme-light .selector-group-header {
   letter-spacing: -0.02em;
 }
 
-.selector-group-type {
+.selector-group-meta {
   min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  display: flex;
+  align-items: center;
+  gap: calc(7 * var(--ui-px));
   color: var(--ui-muted);
   font-size: var(--ui-font-sm);
   line-height: 1.2;
   font-weight: 700;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.selector-group-type {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: inherit;
+  font-size: inherit;
+  line-height: inherit;
+  font-weight: inherit;
+}
+
+.selector-group-current-dot {
+  flex: 0 0 auto;
+  color: var(--ui-muted);
+  opacity: 0.78;
+  font-weight: 800;
+}
+
+.selector-group-current {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.42em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--ui-text);
+  font-family: var(--font-main, system-ui), "Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", sans-serif;
+}
+
+.selector-group-current .emoji-label-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .selector-group-actions {

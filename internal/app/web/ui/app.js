@@ -1676,11 +1676,33 @@
       title.title = groupName;
       titleWrap.appendChild(title);
 
+      var meta = document.createElement("span");
+      meta.className = "selector-group-meta";
+
       if (groupType) {
         var type = document.createElement("span");
         type.className = "selector-group-type";
         type.textContent = groupType;
-        titleWrap.appendChild(type);
+        meta.appendChild(type);
+      }
+
+      if (collapsed && group.current) {
+        if (groupType) {
+          var dot = document.createElement("span");
+          dot.className = "selector-group-current-dot";
+          dot.textContent = "·";
+          meta.appendChild(dot);
+        }
+
+        var currentNode = document.createElement("span");
+        currentNode.className = "selector-group-current";
+        currentNode.title = group.current;
+        appendSelectorLabel(currentNode, group.current);
+        meta.appendChild(currentNode);
+      }
+
+      if (meta.childNodes.length) {
+        titleWrap.appendChild(meta);
       }
       titleBtn.appendChild(titleWrap);
       header.appendChild(titleBtn);

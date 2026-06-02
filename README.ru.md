@@ -1,9 +1,7 @@
-# singbox-wrapper (Windows)
+# singbox-wrapper ([English](/README.md)) <img src="https://img.shields.io/github/stars/Adam-Sizzler/singbox-wrapper?style=social" /> 
+<p align="center"><a href="#"><img src="./build/windows/triangle-512.png" alt="Image" ></a></p>
 
 Нативный Windows GUI-клиент для `sing-box` с portable-логикой.
-
-English version: `README.md`
-Репозиторий: `https://github.com/Adam-Sizzler/singbox-wrapper`
 
 ## Возможности
 

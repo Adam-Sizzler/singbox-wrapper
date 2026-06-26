@@ -44,6 +44,44 @@ const (
 	embeddedSyncDebounce   = 60 * time.Millisecond
 )
 
+// dpiCompensationFactor возвращает коэффициент уменьшения логического размера окна
+// при высоком DPI монитора. Идея взята из Bettbox: при масштабировании > 150%
+// webview/walk уже умножают логические размеры на DPI-фактор, что даёт
+// слишком большое окно. Компенсируем линейно:
+//
+//	≤ 150% (dpr ≤ 1.5) → 1.0   (без изменений)
+//	  200% (dpr = 2.0) → 0.825 (−17.5%)
+func dpiCompensationFactor() float64 {
+	hdc := win.GetDC(0)
+	if hdc == 0 {
+		return 1.0
+	}
+	defer win.ReleaseDC(0, hdc)
+	const logPixelsX = 88
+	dpi := win.GetDeviceCaps(hdc, logPixelsX)
+	if dpi <= 0 {
+		return 1.0
+	}
+	dpr := float64(dpi) / 96.0
+
+	const threshold = 1.5
+	const full = 2.0
+	const rate = 0.175
+	if dpr <= threshold {
+		return 1.0
+	}
+	t := (dpr - threshold) / (full - threshold)
+	if t > 1.0 {
+		t = 1.0
+	}
+	return 1.0 - rate*t
+}
+
+// scaledSize возвращает логический размер, скомпенсированный под высокий DPI.
+func scaledSize(logical int, factor float64) int {
+	return int(float64(logical) * factor)
+}
+
 type windowCompositionAttribData struct {
 	Attrib uint32
 	_      uint32
@@ -142,15 +180,21 @@ func (a *App) runUI() error {
 		a.debugf("ui: SetTitle failed: %v", err)
 		return err
 	}
-	if err := a.web.SetSize(mainWindowMinWidth, mainWindowMinHeight, webview.HintNone); err != nil {
+	dpiF := dpiCompensationFactor()
+	initW := scaledSize(mainWindowMinWidth, dpiF)
+	initH := scaledSize(mainWindowMinHeight, dpiF)
+	maxW := scaledSize(mainWindowMaxWidth, dpiF)
+	maxH := scaledSize(mainWindowMaxHeight, dpiF)
+	a.debugf("ui: DPI compensation factor=%.3f initSize=%dx%d maxSize=%dx%d", dpiF, initW, initH, maxW, maxH)
+	if err := a.web.SetSize(initW, initH, webview.HintNone); err != nil {
 		a.debugf("ui: SetSize initial failed: %v", err)
 		return err
 	}
-	if err := a.web.SetSize(mainWindowMinWidth, mainWindowMinHeight, webview.HintMin); err != nil {
+	if err := a.web.SetSize(initW, initH, webview.HintMin); err != nil {
 		a.debugf("ui: SetSize min failed: %v", err)
 		return err
 	}
-	if err := a.web.SetSize(mainWindowMaxWidth, mainWindowMaxHeight, webview.HintMax); err != nil {
+	if err := a.web.SetSize(maxW, maxH, webview.HintMax); err != nil {
 		a.debugf("ui: SetSize max failed: %v", err)
 		return err
 	}
@@ -1137,6 +1181,8 @@ func (a *App) ensureTrayOwnerWindow() error {
 	}
 	a.debugf("ui: creating tray owner window")
 
+	dpiF := dpiCompensationFactor()
+
 	owner, err := walk.NewMainWindowWithName("singbox-wrapper-tray-owner")
 	if err != nil {
 		return err
@@ -1155,8 +1201,8 @@ func (a *App) ensureTrayOwnerWindow() error {
 		return err
 	}
 	if err := owner.SetMinMaxSize(
-		walk.Size{Width: mainWindowMinWidth, Height: mainWindowMinHeight},
-		walk.Size{Width: mainWindowMaxWidth, Height: mainWindowMaxHeight},
+		walk.Size{Width: scaledSize(mainWindowMinWidth, dpiF), Height: scaledSize(mainWindowMinHeight, dpiF)},
+		walk.Size{Width: scaledSize(mainWindowMaxWidth, dpiF), Height: scaledSize(mainWindowMaxHeight, dpiF)},
 	); err != nil {
 		owner.Dispose()
 		return err

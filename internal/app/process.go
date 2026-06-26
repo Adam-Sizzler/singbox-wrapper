@@ -209,11 +209,16 @@ func (a *App) startPipeline() error {
 		}
 		a.log("URL не задан, использую локальный %s", runtimeCfgFile)
 	} else {
-		updated, err := a.refreshRuntimeConfigFromURL(resolvedConfigURL, runtimeCfgPath)
-		if err != nil {
-			return err
-		}
-		if updated {
+		updated, fetchErr := a.refreshRuntimeConfigFromURL(resolvedConfigURL, runtimeCfgPath)
+		if fetchErr != nil {
+			// Подписка недоступна — логируем предупреждение и пробуем использовать
+			// кэшированный конфиг. Если кэша тоже нет — прерываем запуск.
+			a.log("WARN: не удалось обновить подписку: %v", fetchErr)
+			if err := a.ensureLocalRuntimeConfig(runtimeCfgPath); err != nil {
+				return fmt.Errorf("подписка недоступна и локальный %s не найден: %w", runtimeCfgFile, fetchErr)
+			}
+			a.log("Использую кэшированный %s (подписка была недоступна)", runtimeCfgFile)
+		} else if updated {
 			a.log("Скачан и обновлён %s", runtimeCfgFile)
 		} else {
 			a.log("%s уже актуален", runtimeCfgFile)

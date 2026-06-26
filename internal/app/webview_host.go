@@ -90,6 +90,7 @@ type webViewHost struct {
 func newWebViewHost(
 	parentHWND win.HWND,
 	startHidden bool,
+	uiScale float64,
 	onReady func(),
 	onExternalURL func(string),
 	debugf func(string, ...any),
@@ -157,6 +158,18 @@ func newWebViewHost(
 
 	view.Init(webViewBridgeScript)
 	host.debugf("webview: init script injected")
+
+	// Применяем DPI-компенсацию через CSS-переменную --ui-display-scale.
+	// Скрипт выполняется до любого другого кода страницы (webview Init),
+	// поэтому все calc()-вычисления в theme.css уже используют правильный масштаб.
+	if uiScale > 0 && uiScale < 1.0 {
+		scaleScript := fmt.Sprintf(
+			`(function(){document.documentElement.style.setProperty('--ui-display-scale','%.4f');})();`,
+			uiScale,
+		)
+		view.Init(scaleScript)
+		host.debugf("webview: ui scale init script injected scale=%.4f", uiScale)
+	}
 	return host, nil
 }
 

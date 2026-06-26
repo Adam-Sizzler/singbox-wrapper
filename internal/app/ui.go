@@ -146,6 +146,7 @@ func (a *App) runUI() error {
 	webHost, err := newWebViewHost(
 		webParent,
 		false,
+		dpiCompensationFactor(),
 		func() {
 			a.debugf("ui: webview ready callback")
 			showMainWindow(false)

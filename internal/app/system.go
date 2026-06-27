@@ -210,3 +210,35 @@ func dpiCompensationFactor() float64 {
 func scaledSize(logical int, factor float64) int {
 	return int(float64(logical) * factor)
 }
+
+// gclpHBRBACKGROUND — индекс WNDCLASSEX.hbrBackground в SetClassLongPtrW.
+const gclpHBRBACKGROUND = -10
+
+var (
+	procCreateSolidBrush = sysDLLGdi32.NewProc("CreateSolidBrush")
+)
+
+// applyOwnerWindowBackground выставляет фоновый цвет класса окна чтобы
+// при быстром ресайзе webview не было белых краёв за его границами.
+func applyOwnerWindowBackground(hwnd win.HWND, dark bool) error {
+	if hwnd == 0 {
+		return fmt.Errorf("hwnd is 0")
+	}
+	var r, g, b uint32
+	if dark {
+		r, g, b = 0x19, 0x19, 0x27 // тёмно-синий/чёрный под тему приложения
+	} else {
+		r, g, b = 0xF5, 0xF5, 0xF5 // светло-серый под светлую тему
+	}
+	colorRef := uintptr((b << 16) | (g << 8) | r)
+	hBrush, _, _ := procCreateSolidBrush.Call(colorRef)
+	if hBrush == 0 {
+		return fmt.Errorf("CreateSolidBrush failed")
+	}
+	// Заменяем кисть фона класса окна; старую кисть не удаляем — она системная.
+	if err := procSetClassLongPtrW.Find(); err != nil {
+		return err
+	}
+	_, _, _ = procSetClassLongPtrW.Call(uintptr(hwnd), uintptr(uint32(gclpHBRBACKGROUND)), hBrush)
+	return nil
+}

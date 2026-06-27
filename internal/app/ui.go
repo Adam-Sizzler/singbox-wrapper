@@ -77,7 +77,7 @@ func (a *App) runUI() error {
 	defer uiServer.stop()
 	defer a.shutdownUI()
 
-	if err := a.ensureTrayOwnerWindow(); err != nil {
+	if err := a.ensureTrayOwnerWindow(startupThemeDark); err != nil {
 		a.debugf("ui: ensureTrayOwnerWindow failed: %v", err)
 		return err
 	}
@@ -152,17 +152,20 @@ func (a *App) runUI() error {
 		a.debugf("ui: SetTitle failed: %v", err)
 		return err
 	}
+	// Минимальный и начальный размер — оригинальные значения без DPI-компенсации:
+	// CSS --ui-display-scale делает элементы компактнее, а лейаут (sidebar + content)
+	// требует минимум ~940 DIP чтобы не схлопываться в 1 колонку.
+	// Максимум сжимаем через dpiF чтобы окно не занимало весь экран на высоком DPI.
 	dpiF := dpiCompensationFactor()
-	initW := scaledSize(mainWindowMinWidth, dpiF)
-	initH := scaledSize(mainWindowMinHeight, dpiF)
 	maxW := scaledSize(mainWindowMaxWidth, dpiF)
 	maxH := scaledSize(mainWindowMaxHeight, dpiF)
-	a.debugf("ui: DPI compensation factor=%.3f initSize=%dx%d maxSize=%dx%d", dpiF, initW, initH, maxW, maxH)
-	if err := a.web.SetSize(initW, initH, webview.HintNone); err != nil {
+	a.debugf("ui: DPI compensation factor=%.3f initial=%dx%d max=%dx%d",
+		dpiF, mainWindowMinWidth, mainWindowMinHeight, maxW, maxH)
+	if err := a.web.SetSize(mainWindowMinWidth, mainWindowMinHeight, webview.HintNone); err != nil {
 		a.debugf("ui: SetSize initial failed: %v", err)
 		return err
 	}
-	if err := a.web.SetSize(initW, initH, webview.HintMin); err != nil {
+	if err := a.web.SetSize(mainWindowMinWidth, mainWindowMinHeight, webview.HintMin); err != nil {
 		a.debugf("ui: SetSize min failed: %v", err)
 		return err
 	}
@@ -1147,7 +1150,7 @@ func allowDarkModeForWindow(hwnd win.HWND, dark bool) {
 	_, _, _ = procAllowDarkModeWindow.Call(uintptr(hwnd), enabled)
 }
 
-func (a *App) ensureTrayOwnerWindow() error {
+func (a *App) ensureTrayOwnerWindow(dark bool) error {
 	if a.trayOwner != nil {
 		return nil
 	}
@@ -1161,6 +1164,12 @@ func (a *App) ensureTrayOwnerWindow() error {
 	}
 	owner.SetVisible(false)
 
+	// Устанавливаем фоновый цвет окна под тему чтобы при быстром ресайзе
+	// не было белых краёв пока webview не успел перерисоваться.
+	if err := applyOwnerWindowBackground(owner.Handle(), startupThemeDark); err != nil {
+		a.debugf("ui: applyOwnerWindowBackground failed: %v", err)
+	}
+
 	layout := walk.NewVBoxLayout()
 	layout.SetMargins(walk.Margins{})
 	layout.SetSpacing(0)
@@ -1173,7 +1182,7 @@ func (a *App) ensureTrayOwnerWindow() error {
 		return err
 	}
 	if err := owner.SetMinMaxSize(
-		walk.Size{Width: scaledSize(mainWindowMinWidth, dpiF), Height: scaledSize(mainWindowMinHeight, dpiF)},
+		walk.Size{Width: mainWindowMinWidth, Height: mainWindowMinHeight},
 		walk.Size{Width: scaledSize(mainWindowMaxWidth, dpiF), Height: scaledSize(mainWindowMaxHeight, dpiF)},
 	); err != nil {
 		owner.Dispose()

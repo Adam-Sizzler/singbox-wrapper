@@ -121,7 +121,6 @@ func executableDir() (string, error) {
 	return filepath.Dir(exe), nil
 }
 
-
 func ensureSingBoxProtocolRegistration() error {
 	exePath, err := os.Executable()
 	if err != nil {
@@ -239,6 +238,7 @@ func applyOwnerWindowBackground(hwnd win.HWND, dark bool) error {
 	if err := procSetClassLongPtrW.Find(); err != nil {
 		return err
 	}
-	_, _, _ = procSetClassLongPtrW.Call(uintptr(hwnd), uintptr(uint32(gclpHBRBACKGROUND)), hBrush)
+	idx := int32(gclpHBRBACKGROUND) // промежуточная переменная: константу нельзя напрямую привести к uintptr
+	_, _, _ = procSetClassLongPtrW.Call(uintptr(hwnd), uintptr(idx), hBrush)
 	return nil
 }

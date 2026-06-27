@@ -1166,7 +1166,7 @@ func (a *App) ensureTrayOwnerWindow(dark bool) error {
 
 	// Устанавливаем фоновый цвет окна под тему чтобы при быстром ресайзе
 	// не было белых краёв пока webview не успел перерисоваться.
-	if err := applyOwnerWindowBackground(owner.Handle(), startupThemeDark); err != nil {
+	if err := applyOwnerWindowBackground(owner.Handle(), dark); err != nil {
 		a.debugf("ui: applyOwnerWindowBackground failed: %v", err)
 	}
 

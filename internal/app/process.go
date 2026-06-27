@@ -128,22 +128,22 @@ func (a *App) refreshConfigAction() error {
 			return err
 		}
 
-		profileName, runtimeCfgPath, runtimeCfgFile, resolvedConfigURL, updated, err := a.refreshActiveProfileRuntimeConfigFromURL(uiConfigActionTimeout)
+		res, err := a.refreshActiveProfileRuntimeConfigFromURL(uiConfigActionTimeout)
 		if err != nil {
 			return err
 		}
 
-		if strings.TrimSpace(resolvedConfigURL) == "" {
-			if err := a.ensureLocalRuntimeConfig(runtimeCfgPath); err != nil {
+		if strings.TrimSpace(res.ResolvedConfigURL) == "" {
+			if err := a.ensureLocalRuntimeConfig(res.RuntimeCfgPath); err != nil {
 				return err
 			}
-			a.log("Конфигурация обновлена: подготовлен локальный %s (профиль: %s)", runtimeCfgFile, profileName)
+			a.log("Конфигурация обновлена: подготовлен локальный %s (профиль: %s)", res.RuntimeCfgFile, res.ProfileName)
 		} else {
-			if updated {
-				a.log("Конфигурация обновлена: %s (профиль: %s)", runtimeCfgFile, profileName)
+			if res.Updated {
+				a.log("Конфигурация обновлена: %s (профиль: %s)", res.RuntimeCfgFile, res.ProfileName)
 				a.invalidateSelectorCache()
 			} else {
-				a.log("Конфигурация уже актуальна: %s (профиль: %s)", runtimeCfgFile, profileName)
+				a.log("Конфигурация уже актуальна: %s (профиль: %s)", res.RuntimeCfgFile, res.ProfileName)
 			}
 		}
 
@@ -258,7 +258,7 @@ func (a *App) startPipeline() error {
 	} else {
 		a.resetClashSession()
 	}
-	if err := a.startProcess(runCfgPath); err != nil {
+	if err := a.startProcess(runCfgPath, normalizeSingboxEnv(cfg.SingboxEnv)); err != nil {
 		a.resetClashSession()
 		return err
 	}
@@ -345,7 +345,7 @@ func (a *App) ensureSingBox(targetVersion string) error {
 	return nil
 }
 
-func (a *App) startProcess(runtimeCfgPath string) error {
+func (a *App) startProcess(runtimeCfgPath string, envOverrides map[string]string) error {
 	if _, err := os.Stat(a.singBoxPath); err != nil {
 		return fmt.Errorf("не найден %s", singboxExeName)
 	}
@@ -356,8 +356,6 @@ func (a *App) startProcess(runtimeCfgPath string) error {
 	cmd := exec.Command(a.singBoxPath, "run", "-c", runtimeCfgPath)
 	cmd.Dir = a.workDir
 	cmd.SysProcAttr = &syscall.SysProcAttr{CreationFlags: createNoWindow | createNewProcessGroup}
-	cfg := a.getConfigSnapshot()
-	envOverrides := normalizeSingboxEnv(cfg.SingboxEnv)
 	if len(envOverrides) > 0 {
 		env := os.Environ()
 		for key, value := range envOverrides {

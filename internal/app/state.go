@@ -40,7 +40,6 @@ const (
 	gracefulStopTimeout = 4 * time.Second
 	forceStopTimeout    = 2 * time.Second
 	maxLogLines         = 2000
-	uiScaleCacheTTL     = 30 * time.Second
 )
 
 var semverRegex = regexp.MustCompile(`\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?`)
@@ -86,10 +85,6 @@ type App struct {
 	logEntries []logEntry
 	logStart   int
 	nextLogID  int64
-
-	uiScaleMu       sync.Mutex
-	cachedUIScale   float64
-	cachedUIScaleAt time.Time
 
 	instanceIPCMu sync.Mutex
 	instanceMutex windows.Handle
@@ -197,18 +192,10 @@ func (a *App) persistConfig(cfg AppConfig) error {
 	return nil
 }
 
-func (a *App) uiScaleSnapshot() float64 {
-	now := time.Now()
-
-	a.uiScaleMu.Lock()
-	defer a.uiScaleMu.Unlock()
-
-	if a.cachedUIScale <= 0 || a.cachedUIScaleAt.IsZero() || now.Sub(a.cachedUIScaleAt) >= uiScaleCacheTTL {
-		a.cachedUIScale = systemUIScale()
-		a.cachedUIScaleAt = now
-	}
-
-	return a.cachedUIScale
+// uiScaleForState возвращает системный масштаб для передачи во фронтенд.
+// DPI не меняется без перезапуска, поэтому используем sync.Once из system.go.
+func uiScaleForState() float64 {
+	return dpiCompensationFactor()
 }
 
 func (a *App) snapshotState() AppState {
@@ -240,7 +227,7 @@ func (a *App) snapshotState() AppState {
 		AutoUpdateHours:     cfg.AutoUpdateHours,
 		AutoStartCore:       cfg.AutoStartCore,
 		StartMinimizedTray:  cfg.StartMinimizedToTray,
-		UIScale:             a.uiScaleSnapshot(),
+		UIScale:             uiScaleForState(),
 		UptimeSeconds:       a.processUptimeSeconds(),
 		Running:             running,
 		Busy:                busy,

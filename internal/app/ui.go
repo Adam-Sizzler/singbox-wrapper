@@ -44,44 +44,6 @@ const (
 	embeddedSyncDebounce   = 60 * time.Millisecond
 )
 
-// dpiCompensationFactor возвращает коэффициент уменьшения логического размера окна
-// при высоком DPI монитора. Идея взята из Bettbox: при масштабировании > 150%
-// webview/walk уже умножают логические размеры на DPI-фактор, что даёт
-// слишком большое окно. Компенсируем линейно:
-//
-//	≤ 150% (dpr ≤ 1.5) → 1.0   (без изменений)
-//	  200% (dpr = 2.0) → 0.825 (−17.5%)
-func dpiCompensationFactor() float64 {
-	hdc := win.GetDC(0)
-	if hdc == 0 {
-		return 1.0
-	}
-	defer win.ReleaseDC(0, hdc)
-	const logPixelsX = 88
-	dpi := win.GetDeviceCaps(hdc, logPixelsX)
-	if dpi <= 0 {
-		return 1.0
-	}
-	dpr := float64(dpi) / 96.0
-
-	const threshold = 1.5
-	const full = 2.0
-	const rate = 0.175
-	if dpr <= threshold {
-		return 1.0
-	}
-	t := (dpr - threshold) / (full - threshold)
-	if t > 1.0 {
-		t = 1.0
-	}
-	return 1.0 - rate*t
-}
-
-// scaledSize возвращает логический размер, скомпенсированный под высокий DPI.
-func scaledSize(logical int, factor float64) int {
-	return int(float64(logical) * factor)
-}
-
 type windowCompositionAttribData struct {
 	Attrib uint32
 	_      uint32
@@ -149,6 +111,15 @@ func (a *App) runUI() error {
 		dpiCompensationFactor(),
 		func() {
 			a.debugf("ui: webview ready callback")
+			// Eval() запускается ПОСЛЕ инициализации фронтенда — перекрываем
+			// любое значение --ui-display-scale которое мог выставить JS приложения.
+			if dpiF := dpiCompensationFactor(); dpiF < 1.0 {
+				_ = a.web.Eval(fmt.Sprintf(
+					`document.documentElement.style.setProperty('--ui-display-scale','%.4f');`,
+					dpiF,
+				))
+				a.debugf("ui: forced --ui-display-scale=%.4f via Eval after ready", dpiF)
+			}
 			showMainWindow(false)
 		},
 		func(target string) {

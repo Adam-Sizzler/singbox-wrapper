@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"syscall"
 	"unsafe"
 
@@ -15,18 +16,30 @@ import (
 	"golang.org/x/sys/windows/registry"
 )
 
-func hideConsoleWindow() {
-	kernel32 := syscall.NewLazyDLL("kernel32.dll")
-	getConsoleWindow := kernel32.NewProc("GetConsoleWindow")
-	user32 := syscall.NewLazyDLL("user32.dll")
-	showWindow := user32.NewProc("ShowWindow")
+// Пакетные переменные для системных DLL и proc — создаём один раз.
+var (
+	sysDLLKernel32 = syscall.NewLazyDLL("kernel32.dll")
+	sysDLLUser32   = syscall.NewLazyDLL("user32.dll")
+	sysDLLGdi32    = syscall.NewLazyDLL("gdi32.dll")
+	sysDLLShell32  = syscall.NewLazyDLL("shell32.dll")
 
+	procGetConsoleWindow = sysDLLKernel32.NewProc("GetConsoleWindow")
+	procShowWindowSys    = sysDLLUser32.NewProc("ShowWindow")
+	procGetDpiForSystem  = sysDLLUser32.NewProc("GetDpiForSystem")
+	procGetDCSys         = sysDLLUser32.NewProc("GetDC")
+	procReleaseDCSys     = sysDLLUser32.NewProc("ReleaseDC")
+	procGetDeviceCaps    = sysDLLGdi32.NewProc("GetDeviceCaps")
+	procIsUserAnAdmin    = sysDLLShell32.NewProc("IsUserAnAdmin")
+	procShellExecuteW    = sysDLLShell32.NewProc("ShellExecuteW")
+)
+
+func hideConsoleWindow() {
 	const swHide = 0
-	hwnd, _, _ := getConsoleWindow.Call()
+	hwnd, _, _ := procGetConsoleWindow.Call()
 	if hwnd == 0 {
 		return
 	}
-	_, _, _ = showWindow.Call(hwnd, uintptr(swHide))
+	_, _, _ = procShowWindowSys.Call(hwnd, uintptr(swHide))
 }
 
 func systemUIScale() float64 {
@@ -45,41 +58,55 @@ func systemUIScale() float64 {
 }
 
 func systemDPI() int {
-	user32 := syscall.NewLazyDLL("user32.dll")
-	getDpiForSystem := user32.NewProc("GetDpiForSystem")
-	if err := user32.Load(); err == nil {
-		if err := getDpiForSystem.Find(); err == nil {
-			if dpi, _, _ := getDpiForSystem.Call(); dpi >= 96 && dpi <= 960 {
-				return int(dpi)
-			}
+	if err := procGetDpiForSystem.Find(); err == nil {
+		if dpi, _, _ := procGetDpiForSystem.Call(); dpi >= 96 && dpi <= 960 {
+			return int(dpi)
 		}
 	}
-
-	getDC := user32.NewProc("GetDC")
-	releaseDC := user32.NewProc("ReleaseDC")
-	gdi32 := syscall.NewLazyDLL("gdi32.dll")
-	getDeviceCaps := gdi32.NewProc("GetDeviceCaps")
-	if err := user32.Load(); err == nil {
-		if err := gdi32.Load(); err == nil {
-			if err := getDC.Find(); err == nil {
-				if err := releaseDC.Find(); err == nil {
-					if err := getDeviceCaps.Find(); err == nil {
-						hdc, _, _ := getDC.Call(0)
-						if hdc != 0 {
-							const logPixelsX = 88
-							dpi, _, _ := getDeviceCaps.Call(hdc, uintptr(logPixelsX))
-							_, _, _ = releaseDC.Call(0, hdc)
-							if dpi >= 96 && dpi <= 960 {
-								return int(dpi)
-							}
-						}
-					}
-				}
-			}
+	if hdc, _, _ := procGetDCSys.Call(0); hdc != 0 {
+		const logPixelsX = 88
+		dpi, _, _ := procGetDeviceCaps.Call(hdc, uintptr(logPixelsX))
+		_, _, _ = procReleaseDCSys.Call(0, hdc)
+		if dpi >= 96 && dpi <= 960 {
+			return int(dpi)
 		}
 	}
-
 	return 96
+}
+
+func isRunningAsAdmin() bool {
+	ret, _, _ := procIsUserAnAdmin.Call()
+	return ret != 0
+}
+
+func openURLInDefaultBrowser(rawURL string) error {
+	target := strings.TrimSpace(rawURL)
+	if target == "" {
+		return fmt.Errorf("пустой URL")
+	}
+	verbPtr, err := syscall.UTF16PtrFromString("open")
+	if err != nil {
+		return err
+	}
+	targetPtr, err := syscall.UTF16PtrFromString(target)
+	if err != nil {
+		return err
+	}
+	ret, _, callErr := procShellExecuteW.Call(
+		0,
+		uintptr(unsafe.Pointer(verbPtr)),
+		uintptr(unsafe.Pointer(targetPtr)),
+		0,
+		0,
+		1,
+	)
+	if ret <= 32 {
+		if callErr != syscall.Errno(0) {
+			return fmt.Errorf("ShellExecuteW ret=%d: %w", ret, callErr)
+		}
+		return fmt.Errorf("ShellExecuteW ret=%d", ret)
+	}
+	return nil
 }
 
 func executableDir() (string, error) {
@@ -94,47 +121,6 @@ func executableDir() (string, error) {
 	return filepath.Dir(exe), nil
 }
 
-func isRunningAsAdmin() bool {
-	shell32 := syscall.NewLazyDLL("shell32.dll")
-	proc := shell32.NewProc("IsUserAnAdmin")
-	ret, _, _ := proc.Call()
-	return ret != 0
-}
-
-func openURLInDefaultBrowser(rawURL string) error {
-	target := strings.TrimSpace(rawURL)
-	if target == "" {
-		return fmt.Errorf("пустой URL")
-	}
-
-	verbPtr, err := syscall.UTF16PtrFromString("open")
-	if err != nil {
-		return err
-	}
-	targetPtr, err := syscall.UTF16PtrFromString(target)
-	if err != nil {
-		return err
-	}
-
-	shell32 := syscall.NewLazyDLL("shell32.dll")
-	shellExecuteW := shell32.NewProc("ShellExecuteW")
-	ret, _, callErr := shellExecuteW.Call(
-		0,
-		uintptr(unsafe.Pointer(verbPtr)),
-		uintptr(unsafe.Pointer(targetPtr)),
-		0,
-		0,
-		1,
-	)
-
-	if ret <= 32 {
-		if callErr != syscall.Errno(0) {
-			return fmt.Errorf("ShellExecuteW ret=%d: %w", ret, callErr)
-		}
-		return fmt.Errorf("ShellExecuteW ret=%d", ret)
-	}
-	return nil
-}
 
 func ensureSingBoxProtocolRegistration() error {
 	exePath, err := os.Executable()
@@ -185,4 +171,42 @@ func showError(title, message string) {
 		return
 	}
 	_ = win.MessageBox(0, msgPtr, titlePtr, win.MB_OK|win.MB_ICONERROR|win.MB_TOPMOST)
+}
+
+// dpiScaleOnce гарантирует однократное вычисление DPI-компенсации.
+var (
+	dpiScaleOnce  sync.Once
+	dpiScaleValue float64
+)
+
+// dpiCompensationFactor возвращает коэффициент уменьшения логического размера
+// окна/UI при высоком DPI. Вычисляется один раз через sync.Once.
+//
+//	≤ 150% (dpr ≤ 1.5) → 1.0    (без изменений)
+//	  200% (dpr = 2.0) → 0.80   (−20%)
+//	линейная интерполяция
+func dpiCompensationFactor() float64 {
+	dpiScaleOnce.Do(func() {
+		dpr := systemUIScale()
+		const (
+			threshold = 1.5
+			full      = 2.0
+			rate      = 0.20
+		)
+		if dpr <= threshold {
+			dpiScaleValue = 1.0
+			return
+		}
+		t := (dpr - threshold) / (full - threshold)
+		if t > 1.0 {
+			t = 1.0
+		}
+		dpiScaleValue = 1.0 - rate*t
+	})
+	return dpiScaleValue
+}
+
+// scaledSize применяет DPI-компенсацию к логическому размеру в пикселях.
+func scaledSize(logical int, factor float64) int {
+	return int(float64(logical) * factor)
 }

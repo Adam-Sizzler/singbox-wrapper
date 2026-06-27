@@ -108,42 +108,48 @@ func (a *App) runAutoUpdateOnce() {
 		return
 	}
 
-	profileName, _, runtimeCfgFile, resolvedConfigURL, updated, err := a.refreshActiveProfileRuntimeConfigFromURL(0)
+	res, err := a.refreshActiveProfileRuntimeConfigFromURL(0)
 	if err != nil {
-		a.log("WARN: автообновление профиля %s пропущено: %v", profileName, err)
+		a.log("WARN: автообновление профиля %s пропущено: %v", res.ProfileName, err)
 		return
 	}
-	if strings.TrimSpace(resolvedConfigURL) == "" {
+	if strings.TrimSpace(res.ResolvedConfigURL) == "" {
 		return
 	}
-	if updated {
+	if res.Updated {
 		a.invalidateSelectorCache()
-		a.log("Автообновление: обновлён %s (профиль: %s)", runtimeCfgFile, profileName)
+		a.log("Автообновление: обновлён %s (профиль: %s)", res.RuntimeCfgFile, res.ProfileName)
 	}
 }
 
-func (a *App) refreshActiveProfileRuntimeConfigFromURL(timeout time.Duration) (profileName string, runtimeCfgPath string, runtimeCfgFile string, resolvedConfigURL string, updated bool, err error) {
+// refreshResult содержит результат обновления конфига активного профиля.
+type refreshResult struct {
+	ProfileName       string
+	RuntimeCfgPath    string
+	RuntimeCfgFile    string
+	ResolvedConfigURL string
+	Updated           bool
+}
+
+func (a *App) refreshActiveProfileRuntimeConfigFromURL(timeout time.Duration) (res refreshResult, err error) {
 	cfg := a.getConfigSnapshot()
 	active := activeProfileFromConfig(cfg)
 
-	profileName = strings.TrimSpace(active.Name)
-	if profileName == "" {
-		profileName = "profile-1"
+	res.ProfileName = strings.TrimSpace(active.Name)
+	if res.ProfileName == "" {
+		res.ProfileName = "profile-1"
 	}
-	runtimeCfgPath = a.runtimeConfigPathForProfile(profileName)
-	runtimeCfgFile = filepath.Base(runtimeCfgPath)
+	res.RuntimeCfgPath = a.runtimeConfigPathForProfile(res.ProfileName)
+	res.RuntimeCfgFile = filepath.Base(res.RuntimeCfgPath)
 
-	resolvedConfigURL, _, _, err = resolveSubscriptionInput(active.URL)
+	res.ResolvedConfigURL, _, _, err = resolveSubscriptionInput(active.URL)
 	if err != nil {
-		return profileName, runtimeCfgPath, runtimeCfgFile, "", false, err
+		return res, err
 	}
-	if strings.TrimSpace(resolvedConfigURL) == "" {
-		return profileName, runtimeCfgPath, runtimeCfgFile, "", false, nil
+	if strings.TrimSpace(res.ResolvedConfigURL) == "" {
+		return res, nil
 	}
 
-	updated, err = a.refreshRuntimeConfigFromURLWithTimeout(resolvedConfigURL, runtimeCfgPath, timeout)
-	if err != nil {
-		return profileName, runtimeCfgPath, runtimeCfgFile, resolvedConfigURL, false, err
-	}
-	return profileName, runtimeCfgPath, runtimeCfgFile, resolvedConfigURL, updated, nil
+	res.Updated, err = a.refreshRuntimeConfigFromURLWithTimeout(res.ResolvedConfigURL, res.RuntimeCfgPath, timeout)
+	return res, err
 }

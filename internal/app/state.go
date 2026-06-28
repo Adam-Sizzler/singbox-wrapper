@@ -192,10 +192,11 @@ func (a *App) persistConfig(cfg AppConfig) error {
 	return nil
 }
 
-// uiScaleForState возвращает системный масштаб для передачи во фронтенд.
-// DPI не меняется без перезапуска, поэтому используем sync.Once из system.go.
+// uiScaleForState возвращает масштаб для передачи во фронтенд.
+// Возвращаем 1.0: WebView2 сам масштабирует контент через devicePixelRatio,
+// дополнительный CSS-скейл через --ui-display-scale не нужен.
 func uiScaleForState() float64 {
-	return dpiCompensationFactor()
+	return 1.0
 }
 
 func (a *App) snapshotState() AppState {

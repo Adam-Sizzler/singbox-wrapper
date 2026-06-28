@@ -31,6 +31,10 @@ var (
 	procSetClassLongPtrW  = user32DLL.NewProc("SetClassLongPtrW")
 	procSetClassLongW     = user32DLL.NewProc("SetClassLongW")
 	procIsWindow          = user32DLL.NewProc("IsWindow")
+
+	// dwmapi — тёмная тема заголовка и декорации окна
+	dwmapiDLL            = syscall.NewLazyDLL("dwmapi.dll")
+	procDwmSetWindowAttr = dwmapiDLL.NewProc("DwmSetWindowAttribute")
 )
 
 const (
@@ -108,18 +112,8 @@ func (a *App) runUI() error {
 	webHost, err := newWebViewHost(
 		webParent,
 		false,
-		dpiCompensationFactor(),
 		func() {
 			a.debugf("ui: webview ready callback")
-			// Eval() запускается ПОСЛЕ инициализации фронтенда — перекрываем
-			// любое значение --ui-display-scale которое мог выставить JS приложения.
-			if dpiF := dpiCompensationFactor(); dpiF < 1.0 {
-				_ = a.web.Eval(fmt.Sprintf(
-					`document.documentElement.style.setProperty('--ui-display-scale','%.4f');`,
-					dpiF,
-				))
-				a.debugf("ui: forced --ui-display-scale=%.4f via Eval after ready", dpiF)
-			}
 			showMainWindow(false)
 		},
 		func(target string) {
@@ -1082,25 +1076,23 @@ func rgbToColorRef(r, g, b uint32) uint32 {
 }
 
 func setImmersiveDarkMode(hwnd win.HWND, dark bool) {
+	if err := dwmapiDLL.Load(); err != nil {
+		return
+	}
 	var value int32
 	if dark {
 		value = 1
 	}
-
-	dwmapi := syscall.NewLazyDLL("dwmapi.dll")
-	proc := dwmapi.NewProc("DwmSetWindowAttribute")
-	if err := dwmapi.Load(); err != nil {
-		return
+	dwmSet := func(attr uintptr, data unsafe.Pointer, size uintptr) {
+		_, _, _ = procDwmSetWindowAttr.Call(uintptr(hwnd), attr, uintptr(data), size)
 	}
-	_, _, _ = proc.Call(uintptr(hwnd), uintptr(dwmwaUseImmersiveDarkMode), uintptr(unsafe.Pointer(&value)), unsafe.Sizeof(value))
-	_, _, _ = proc.Call(uintptr(hwnd), uintptr(dwmwaUseImmersiveDarkModeBefore), uintptr(unsafe.Pointer(&value)), unsafe.Sizeof(value))
+	dwmSet(uintptr(dwmwaUseImmersiveDarkMode), unsafe.Pointer(&value), unsafe.Sizeof(value))
+	dwmSet(uintptr(dwmwaUseImmersiveDarkModeBefore), unsafe.Pointer(&value), unsafe.Sizeof(value))
 
 	corner := dwmwcpRound
-	_, _, _ = proc.Call(uintptr(hwnd), uintptr(dwmwaWindowCornerPreference), uintptr(unsafe.Pointer(&corner)), unsafe.Sizeof(corner))
+	dwmSet(uintptr(dwmwaWindowCornerPreference), unsafe.Pointer(&corner), unsafe.Sizeof(corner))
 
-	caption := uint32(dwmColorDefault)
-	text := uint32(dwmColorDefault)
-	border := uint32(dwmColorDefault)
+	var caption, text, border uint32
 	if dark {
 		caption = rgbToColorRef(0x31, 0x31, 0x31)
 		text = rgbToColorRef(0xF3, 0xF3, 0xF3)
@@ -1110,9 +1102,9 @@ func setImmersiveDarkMode(hwnd win.HWND, dark bool) {
 		text = rgbToColorRef(0x1E, 0x22, 0x2C)
 		border = dwmColorNone
 	}
-	_, _, _ = proc.Call(uintptr(hwnd), uintptr(dwmwaCaptionColor), uintptr(unsafe.Pointer(&caption)), unsafe.Sizeof(caption))
-	_, _, _ = proc.Call(uintptr(hwnd), uintptr(dwmwaTextColor), uintptr(unsafe.Pointer(&text)), unsafe.Sizeof(text))
-	_, _, _ = proc.Call(uintptr(hwnd), uintptr(dwmwaBorderColor), uintptr(unsafe.Pointer(&border)), unsafe.Sizeof(border))
+	dwmSet(uintptr(dwmwaCaptionColor), unsafe.Pointer(&caption), unsafe.Sizeof(caption))
+	dwmSet(uintptr(dwmwaTextColor), unsafe.Pointer(&text), unsafe.Sizeof(text))
+	dwmSet(uintptr(dwmwaBorderColor), unsafe.Pointer(&border), unsafe.Sizeof(border))
 }
 
 func setPreferredAppTheme(dark bool) {

@@ -14,12 +14,12 @@ import (
 	"time"
 )
 
+// sysDLLKernel32 объявлена в system.go — один LazyDLL на пакет.
 var (
-	kernel32DLL           = syscall.NewLazyDLL("kernel32.dll")
-	procAttachConsole     = kernel32DLL.NewProc("AttachConsole")
-	procFreeConsole       = kernel32DLL.NewProc("FreeConsole")
-	procGenerateCtrlEvent = kernel32DLL.NewProc("GenerateConsoleCtrlEvent")
-	procSetCtrlHandler    = kernel32DLL.NewProc("SetConsoleCtrlHandler")
+	procAttachConsole     = sysDLLKernel32.NewProc("AttachConsole")
+	procFreeConsole       = sysDLLKernel32.NewProc("FreeConsole")
+	procGenerateCtrlEvent = sysDLLKernel32.NewProc("GenerateConsoleCtrlEvent")
+	procSetCtrlHandler    = sysDLLKernel32.NewProc("SetConsoleCtrlHandler")
 )
 
 const (
@@ -481,7 +481,7 @@ func sendCtrlBreakToProcessGroup(pid int) error {
 	if pid <= 0 {
 		return errors.New("invalid pid")
 	}
-	if err := kernel32DLL.Load(); err != nil {
+	if err := sysDLLKernel32.Load(); err != nil {
 		return err
 	}
 	if err := procAttachConsole.Find(); err != nil {

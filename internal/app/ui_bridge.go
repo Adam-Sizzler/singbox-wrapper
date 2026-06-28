@@ -168,10 +168,10 @@ func decodeBridgeBody(raw json.RawMessage, v any) error {
 	if len(body) == 0 || bytes.Equal(body, []byte("null")) {
 		body = []byte("{}")
 	}
-	dec := json.NewDecoder(bytes.NewReader(body))
-	dec.DisallowUnknownFields()
-	if err := dec.Decode(v); err != nil {
-		return err
+	// DisallowUnknownFields не используем: фронтенд может слать новые поля
+	// в будущих версиях — не хотим ломать forward compatibility.
+	if err := json.NewDecoder(bytes.NewReader(body)).Decode(v); err != nil {
+		return fmt.Errorf("decode request body: %w", err)
 	}
 	return nil
 }

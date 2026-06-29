@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	neturl "net/url"
 	"os"
@@ -13,9 +14,16 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"syscall"
 	"time"
 )
+
+// appUpdateHTTPClient переиспользуется для проверки обновлений — не создаём Transport каждый раз.
+var appUpdateHTTPClient = &http.Client{Timeout: 15 * time.Second}
+
+// appUpdateDownloadTimeout — увеличенный таймаут для скачивания бинарника (до 300 МБ).
+const appUpdateDownloadTimeout = 5 * time.Minute
 
 const (
 	appReleaseLatestAPIURL       = "https://api.github.com/repos/Adam-Sizzler/singbox-wrapper/releases/latest"
@@ -94,8 +102,7 @@ func fetchLatestAppReleaseInfo() (appReleaseInfo, error) {
 	}
 	req.Header.Set("User-Agent", appUserAgent())
 
-	client := &http.Client{Timeout: 15 * time.Second}
-	resp, err := client.Do(req)
+	resp, err := appUpdateHTTPClient.Do(req)
 	if err != nil {
 		return appReleaseInfo{}, fmt.Errorf("github недоступен: %w", err)
 	}
@@ -188,7 +195,7 @@ func (a *App) updateApplicationAction() error {
 		_ = os.Remove(nextExe)
 
 		a.log("Скачивание обновления приложения: %s", latest.displayTag)
-		if err := downloadFile(latest.assetURL, nextExe, map[string]string{"User-Agent": appUserAgent()}); err != nil {
+		if err := a.downloadAppUpdate(latest.assetURL, nextExe); err != nil {
 			return fmt.Errorf("не удалось скачать обновление приложения: %w", err)
 		}
 
@@ -239,7 +246,9 @@ func writeSelfUpdateLauncherVBScript(scriptPath, source, target string) (string,
 	launcherPath := filepath.Join(os.TempDir(), fmt.Sprintf("singbox-wrapper-self-update-launcher-%d.vbs", time.Now().UnixNano()))
 
 	cmdLine := fmt.Sprintf(`cmd.exe /C ""%s" "%s" "%s""`, scriptPath, source, target)
+	// Экранируем " для VBS и % для cmd.exe внутри VBS shell.Run
 	escapedCmdLine := strings.ReplaceAll(cmdLine, `"`, `""`)
+	escapedCmdLine = strings.ReplaceAll(escapedCmdLine, "%", "%%")
 
 	launcher := strings.Join([]string{
 		"On Error Resume Next",
@@ -290,9 +299,139 @@ func writeSelfUpdateScript() (string, error) {
 	return scriptPath, nil
 }
 
+// downloadAppUpdate скачивает бинарник обновления и репортует прогресс
+// через CSS-переменную --update-progress в webview (визуальный прогресс-бар на кнопке).
+func (a *App) downloadAppUpdate(url, target string) error {
+	// Устанавливаем прогресс в 0 и добавляем класс на body для активации CSS прогрессбара.
+	atomic.StoreInt32(&a.appUpdateProgressVal, 0)
+	a.setUpdateProgress(0)
+
+	defer func() {
+		// Сбрасываем прогресс после завершения (успех или ошибка).
+		atomic.StoreInt32(&a.appUpdateProgressVal, -1)
+		a.clearUpdateProgress()
+	}()
+
+	req, err := http.NewRequest(http.MethodGet, url, nil)
+	if err != nil {
+		return err
+	}
+	req.Header.Set("User-Agent", appUserAgent())
+
+	client := &http.Client{Timeout: appUpdateDownloadTimeout}
+	resp, err := client.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return fmt.Errorf("HTTP %d", resp.StatusCode)
+	}
+
+	total := resp.ContentLength // -1 если сервер не вернул Content-Length
+
+	tmpPath := target + ".tmp"
+	file, err := os.Create(tmpPath)
+	if err != nil {
+		return err
+	}
+
+	var downloaded int64
+	lastLoggedPct := -1
+	buf := make([]byte, 32*1024)
+	for {
+		n, readErr := resp.Body.Read(buf)
+		if n > 0 {
+			if _, writeErr := file.Write(buf[:n]); writeErr != nil {
+				file.Close()
+				_ = os.Remove(tmpPath)
+				return writeErr
+			}
+			downloaded += int64(n)
+			if total > 0 {
+				pct := int(downloaded * 100 / total)
+				if pct > 100 {
+					pct = 100
+				}
+				atomic.StoreInt32(&a.appUpdateProgressVal, int32(pct))
+				// Логируем и обновляем UI каждые 10%
+				if pct >= lastLoggedPct+10 {
+					lastLoggedPct = pct
+					a.log("Скачивание обновления: %.1f МБ / %.1f МБ (%d%%)",
+						float64(downloaded)/(1024*1024),
+						float64(total)/(1024*1024),
+						pct)
+					a.setUpdateProgress(pct)
+				}
+			} else {
+				// Неизвестный размер — логируем каждые 5 МБ
+				const logEvery = 5 * 1024 * 1024
+				if downloaded/logEvery > (downloaded-int64(n))/logEvery {
+					a.log("Скачивание обновления: %.1f МБ...", float64(downloaded)/(1024*1024))
+				}
+			}
+		}
+		if readErr != nil {
+			if errors.Is(readErr, io.EOF) {
+				break
+			}
+			file.Close()
+			_ = os.Remove(tmpPath)
+			return readErr
+		}
+	}
+
+	if err := file.Close(); err != nil {
+		_ = os.Remove(tmpPath)
+		return err
+	}
+	if err := os.Rename(tmpPath, target); err != nil {
+		_ = os.Remove(tmpPath)
+		return err
+	}
+	// Финальный прогресс 100%
+	atomic.StoreInt32(&a.appUpdateProgressVal, 100)
+	a.setUpdateProgress(100)
+	return nil
+}
+
+// setUpdateProgress устанавливает CSS-переменную --update-progress в webview.
+// Добавляет класс app-updating на body при первом вызове.
+func (a *App) setUpdateProgress(pct int) {
+	if a.web == nil {
+		return
+	}
+	// Используем Dispatch чтобы Eval выполнился на потоке webview — безопасно
+	// вызывать из любой горутины (загрузка файла, etc.)
+	js := fmt.Sprintf(
+		`(function(){`+
+			`document.documentElement.style.setProperty('--update-progress','%d%%');`+
+			`document.body.classList.add('app-updating');`+
+			`})();`,
+		pct,
+	)
+	a.web.Dispatch(func() { _ = a.web.Eval(js) })
+}
+
+// clearUpdateProgress сбрасывает прогресс-бар и убирает класс app-updating.
+func (a *App) clearUpdateProgress() {
+	if a.web == nil {
+		return
+	}
+	a.web.Dispatch(func() {
+		_ = a.web.Eval(
+			`(function(){` +
+				`document.documentElement.style.removeProperty('--update-progress');` +
+				`document.body.classList.remove('app-updating');` +
+				`})();`,
+		)
+	})
+}
+
 func (a *App) closeForSelfUpdate() {
 	go func() {
-		time.Sleep(200 * time.Millisecond)
+		time.Sleep(1000 * time.Millisecond) // Даём wscript.exe время запуститься и прочитать .cmd файл
 		a.requestMainWindowClose()
 	}()
 }

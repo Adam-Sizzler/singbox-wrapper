@@ -2174,3 +2174,35 @@ img.emoji-inline,
   font-family: "Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", sans-serif;
   font-size: 1em;
 }
+
+/* ═══════════════════════════════════════════════════════════
+   Прогресс-бар скачивания обновления приложения.
+   Активируется Go через Eval: body.classList.add('app-updating')
+   и document.documentElement.style.setProperty('--update-progress', '45%').
+   Заполняет все .release-menu-action кнопки снизу вверх.
+   ═══════════════════════════════════════════════════════════ */
+
+body.app-updating .release-menu-action {
+  position: relative;
+  overflow: hidden;
+  cursor: wait;
+}
+
+body.app-updating .release-menu-action::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  top: 0;
+  width: var(--update-progress, 0%);
+  background: var(--ui-accent);
+  opacity: 0.35;
+  pointer-events: none;
+  transition: width 0.4s ease;
+  border-radius: inherit;
+}
+
+/* Блокируем клики на кнопках меню во время загрузки */
+body.app-updating .release-menu-action:disabled {
+  opacity: 0.6;
+}

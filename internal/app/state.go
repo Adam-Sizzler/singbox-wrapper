@@ -9,6 +9,7 @@ import (
 	"regexp"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/lxn/walk"
@@ -117,6 +118,7 @@ type App struct {
 	appUpdateAvailable   bool
 	appLatestReleaseTag  string
 	appLatestReleaseURL  string
+	appUpdateProgressVal int32 // atomic: -1=idle 0-100=downloading
 
 	themeWatchStop chan struct{}
 	powerWatchStop chan struct{}
@@ -160,6 +162,8 @@ type AppState struct {
 	AppUpdateAvailable  bool                 `json:"app_update_available"`
 	AppLatestReleaseTag string               `json:"app_latest_release_tag,omitempty"`
 	AppLatestReleaseURL string               `json:"app_latest_release_url,omitempty"`
+	// AppUpdateProgress: -1 = не активно, 0–100 = процент скачивания
+	AppUpdateProgress   int                  `json:"app_update_progress"`
 }
 
 func (a *App) setConfig(cfg AppConfig) {
@@ -239,6 +243,7 @@ func (a *App) snapshotState() AppState {
 		AppUpdateAvailable:  appUpdateAvailable,
 		AppLatestReleaseTag: appLatestTag,
 		AppLatestReleaseURL: appLatestURL,
+		AppUpdateProgress:   int(atomic.LoadInt32(&a.appUpdateProgressVal)),
 	}
 }
 
